@@ -1,0 +1,971 @@
+IMPORTANT UPDATE — GOOGLE LOGIN + PERMANENT DATABASE STORAGE + USER DATA SECURITY
+
+Upgrade the Trading Journal into a real multi-user cloud application.
+
+This application must NOT use only localStorage, sessionStorage, temporary
+browser memory, mock data, or static JSON for storing user trading data.
+
+All important user data must be permanently stored in a cloud database and
+linked to the authenticated user's account.
+
+==================================================
+1. GOOGLE AUTHENTICATION
+==================================================
+
+Implement a complete authentication system using:
+
+Firebase Authentication + Google Sign-In
+
+Preferred login method:
+
+"Continue with Google"
+
+Create the following authentication flow:
+
+User opens application
+        ↓
+Not authenticated
+        ↓
+Show Login Page
+        ↓
+"Continue with Google"
+        ↓
+Google Account Selection
+        ↓
+Authentication successful
+        ↓
+Create/find user profile in database
+        ↓
+Redirect to Dashboard
+        ↓
+Load ONLY that user's trading data
+
+If the user is already authenticated, automatically restore their session
+and take them to the dashboard.
+
+==================================================
+2. LOGIN PAGE
+==================================================
+
+Create a professional dark-mode login screen matching the Trading Journal.
+
+Display:
+
+Trading Journal logo
+
+Heading:
+"Welcome Back"
+
+Subheading:
+"Sign in to access your trading journal."
+
+Main button:
+
+[ Google Icon ] Continue with Google
+
+Below it display:
+
+"Your trading data is private and securely linked to your account."
+
+The page must work correctly on desktop and mobile.
+
+==================================================
+3. USER PROFILE
+==================================================
+
+After Google authentication, store the user's profile.
+
+Suggested user document:
+
+users/{userId}
+
+Fields:
+
+uid
+displayName
+email
+photoURL
+createdAt
+lastLoginAt
+preferredCurrency
+timezone
+defaultRiskPercent
+
+Use the unique Firebase Authentication UID as the primary identifier.
+
+DO NOT use display name as an identifier.
+
+DO NOT use email address alone as the database security identifier.
+
+==================================================
+4. PER-USER DATA ISOLATION
+==================================================
+
+THIS IS CRITICAL.
+
+Every user's trading information must belong only to that authenticated user.
+
+Example:
+
+User A logs in with:
+accountA@gmail.com
+
+They should ONLY see User A's:
+- Trades
+- Accounts
+- Screenshots
+- Strategies
+- Analytics
+- Calendar
+- Notes
+- Tags
+- News trades
+- Settings
+
+User B logs in with:
+accountB@gmail.com
+
+User B must see a completely separate journal.
+
+User B must NEVER be able to read, edit, delete or access User A's data.
+
+The application must enforce this at the DATABASE SECURITY RULE level.
+
+Do NOT rely only on frontend filtering such as:
+
+where userId === currentUser.uid
+
+Frontend filtering alone is NOT sufficient security.
+
+==================================================
+5. DATABASE
+==================================================
+
+Use:
+
+Firebase Firestore
+
+for persistent trading journal storage.
+
+Store data in a user-scoped structure.
+
+Recommended structure:
+
+users/{uid}
+
+users/{uid}/accounts/{accountId}
+
+users/{uid}/trades/{tradeId}
+
+users/{uid}/strategies/{strategyId}
+
+users/{uid}/tags/{tagId}
+
+users/{uid}/tradeReviews/{reviewId}
+
+users/{uid}/settings/preferences
+
+This structure makes user ownership explicit.
+
+Example:
+
+users/
+   UID_USER_1/
+      profile
+      accounts/
+      trades/
+      strategies/
+      tags/
+
+   UID_USER_2/
+      profile
+      accounts/
+      trades/
+      strategies/
+      tags/
+
+Never mix private trading data between users.
+
+==================================================
+6. TRADE STORAGE
+==================================================
+
+When the user creates a trade, permanently save it to Firestore.
+
+Example trade:
+
+users/{uid}/trades/{tradeId}
+
+Fields:
+
+id
+userId
+accountId
+
+date
+time
+
+symbol
+direction
+session
+
+strategyId
+strategyName
+
+entryPrice
+stopLoss
+takeProfit
+exitPrice
+
+lotSize
+
+riskPercent
+riskAmount
+
+plannedRR
+realizedRR
+
+grossPL
+commission
+fees
+netPL
+
+outcome
+
+notes
+
+newsEvent
+currency
+actual
+forecast
+previous
+
+emotionBefore
+emotionAfter
+
+followedPlan
+tradeRating
+
+createdAt
+updatedAt
+
+Use server timestamps where appropriate.
+
+==================================================
+7. DATA MUST SURVIVE LOGOUT
+==================================================
+
+Example:
+
+I log into the application.
+
+I add:
+
+Trade #1
+XAUUSD
+BUY
+Entry: 3350
+SL: 3340
+TP: 3370
+Result: WIN
+Profit: $200
+
+I close the browser.
+
+I return tomorrow.
+
+I log in using the SAME Google account.
+
+Trade #1 MUST still exist.
+
+It should automatically appear in:
+
+Trading Journal
+Calendar
+Trade Gallery
+Analytics
+Equity Curve
+Strategy Analytics
+Pair Analytics
+
+Nothing should disappear because the browser was closed.
+
+==================================================
+8. MULTI-DEVICE SUPPORT
+==================================================
+
+Data must NOT be tied to one device.
+
+Example:
+
+I add trades from my laptop.
+
+Later I open the Trading Journal on my phone.
+
+I sign in using the same Google account.
+
+All my trades, screenshots, analytics, strategies and settings must
+automatically appear.
+
+The cloud database must be the source of truth.
+
+==================================================
+9. SCREENSHOT STORAGE
+==================================================
+
+Use:
+
+Firebase Storage
+
+for trade screenshots.
+
+DO NOT store large images directly inside Firestore documents.
+
+Use a secure path such as:
+
+users/{uid}/trades/{tradeId}/screenshots/{imageId}.jpg
+
+After upload, store screenshot metadata in Firestore.
+
+Example:
+
+users/{uid}/trades/{tradeId}/screenshots/{screenshotId}
+
+Fields:
+
+id
+tradeId
+userId
+storagePath
+fileName
+fileType
+fileSize
+category
+caption
+createdAt
+
+Screenshot categories:
+
+Before Entry
+Entry
+During Trade
+Exit
+Post-Trade Analysis
+
+==================================================
+10. SCREENSHOT SECURITY
+==================================================
+
+Firebase Storage security rules must ensure:
+
+Authenticated user can upload to their own folder.
+
+Authenticated user can read their own screenshots.
+
+Authenticated user can delete their own screenshots.
+
+User A must NEVER access User B's screenshots.
+
+Enforce ownership using Firebase Authentication UID.
+
+==================================================
+11. FIRESTORE SECURITY RULES
+==================================================
+
+Create production-quality Firestore Security Rules.
+
+Conceptually enforce:
+
+request.auth != null
+
+AND
+
+request.auth.uid == uid
+
+for every private user path.
+
+Example concept:
+
+match /users/{uid}/{document=**} {
+
+    allow read, write:
+        if request.auth != null
+        && request.auth.uid == uid;
+
+}
+
+Do not blindly copy this simplified example if more restrictive
+collection-specific validation is appropriate.
+
+Generate proper security rules for the final schema.
+
+Validate ownership on:
+
+Create
+Read
+Update
+Delete
+
+Never use:
+
+allow read, write: if true;
+
+in production.
+
+==================================================
+12. STORAGE SECURITY RULES
+==================================================
+
+Generate Firebase Storage security rules.
+
+Only authenticated owners should access:
+
+users/{uid}/...
+
+Conceptually:
+
+request.auth != null
+&&
+request.auth.uid == uid
+
+Also validate uploaded images.
+
+Allowed file types:
+
+image/jpeg
+image/png
+image/webp
+
+Create a reasonable maximum upload size.
+
+Reject unsupported files.
+
+==================================================
+13. PROTECTED ROUTES
+==================================================
+
+Protect all private pages.
+
+Private routes:
+
+/dashboard
+/journal
+/calendar
+/gallery
+/analytics
+/strategies
+/accounts
+/settings
+/trades/*
+/reviews/*
+
+If unauthenticated users attempt to access these pages:
+
+Redirect to:
+
+/login
+
+Do not render private data before authentication has been verified.
+
+==================================================
+14. AUTHENTICATION STATE
+==================================================
+
+Create a global authentication provider/context.
+
+Expose:
+
+currentUser
+loading
+isAuthenticated
+signInWithGoogle()
+logout()
+
+While Firebase determines authentication state, display a professional
+loading screen/skeleton.
+
+Do NOT briefly expose dashboard information before redirecting an
+unauthenticated user.
+
+==================================================
+15. USER MENU
+==================================================
+
+Display the logged-in user's Google profile in the application.
+
+Show:
+
+Google profile picture
+Display name
+Email
+
+Dropdown:
+
+Profile
+Settings
+Logout
+
+Mobile should have the same functionality.
+
+==================================================
+16. LOGOUT
+==================================================
+
+Add a Logout button.
+
+When clicked:
+
+1. Sign out from Firebase Authentication.
+2. Clear sensitive client-side cached state.
+3. Redirect to /login.
+
+DO NOT delete the user's database data.
+
+Logging out must NOT remove:
+
+Trades
+Accounts
+Strategies
+Screenshots
+Analytics data
+Settings
+
+When the user signs back in, everything must return.
+
+==================================================
+17. REAL-TIME DATA
+==================================================
+
+Where appropriate, use Firestore real-time listeners.
+
+Example:
+
+User adds a trade.
+
+The following should update automatically:
+
+Journal
+Dashboard
+Calendar
+Analytics
+
+without requiring a manual browser refresh.
+
+Avoid unnecessary listeners that increase database usage.
+
+==================================================
+18. DATA FLOW
+==================================================
+
+Follow this architecture:
+
+Google Login
+      ↓
+Firebase Authentication
+      ↓
+Firebase UID
+      ↓
+User-specific Firestore data
+      ↓
+Trading Journal UI
+      ↓
+Analytics calculated from user's trades
+
+Screenshots:
+
+User
+ ↓
+Upload Screenshot
+ ↓
+Firebase Storage
+ ↓
+Secure user folder
+ ↓
+Metadata stored in Firestore
+ ↓
+Trade Gallery
+
+==================================================
+19. ANALYTICS DATA ISOLATION
+==================================================
+
+All analytics must be calculated ONLY from the currently authenticated
+user's trades.
+
+For example:
+
+User A:
+100 trades
+70 wins
+30 losses
+
+Win Rate = 70%
+
+User B:
+20 trades
+8 wins
+12 losses
+
+Win Rate = 40%
+
+User B's trades must never affect User A's statistics.
+
+This applies to:
+
+Win Rate
+Loss Rate
+Profit Factor
+Total P/L
+Average Win
+Average Loss
+Equity Curve
+Drawdown
+Strategy Performance
+Pair Performance
+Session Performance
+News Performance
+Calendar
+Daily P/L
+Weekly P/L
+Monthly P/L
+
+==================================================
+20. MULTIPLE TRADING ACCOUNTS
+==================================================
+
+A single Google user should be able to create multiple trading accounts.
+
+Example:
+
+My Google Account
+
+Trading Accounts:
+
+$10K Funded Account
+$5K Funded Account
+Personal Account
+Demo Account
+
+All belong to the same authenticated user.
+
+Allow:
+
+View All Accounts
+
+or filter by:
+
+Individual Account
+
+Analytics must recalculate based on the selected account.
+
+==================================================
+21. DATA OWNERSHIP
+==================================================
+
+Every database operation must use the authenticated UID.
+
+Never trust a userId supplied manually by the browser.
+
+For sensitive backend operations, derive identity from the authenticated
+Firebase session/token.
+
+Do not allow a user to change the owner/userId of an existing trade.
+
+==================================================
+22. ERROR HANDLING
+==================================================
+
+Handle:
+
+Google login failure
+Network failure
+Database write failure
+Image upload failure
+Expired authentication session
+Unauthorized access
+Missing documents
+Invalid trade data
+
+Show clean messages such as:
+
+"Unable to save trade. Please try again."
+
+"Screenshot upload failed."
+
+"Your session has expired. Please sign in again."
+
+Never silently lose user data.
+
+==================================================
+23. SAVE INDICATORS
+==================================================
+
+When saving a trade show:
+
+Saving...
+
+Then:
+
+✓ Trade saved
+
+For editing:
+
+Saving changes...
+
+Then:
+
+✓ Changes saved
+
+For screenshot:
+
+Uploading 45%...
+
+Then:
+
+✓ Screenshot uploaded
+
+Disable repeated submission while a save request is already running.
+
+==================================================
+24. DELETE BEHAVIOR
+==================================================
+
+Before deleting a trade show:
+
+"Delete this trade?"
+
+"This action will permanently remove the trade and its associated
+screenshots."
+
+Buttons:
+
+Cancel
+Delete Trade
+
+If confirmed:
+
+Delete Firestore trade data.
+Delete associated screenshots from Firebase Storage.
+Update analytics.
+
+==================================================
+25. ACCOUNT DELETION
+==================================================
+
+In Settings provide:
+
+Delete Account
+
+This must require strong confirmation.
+
+Deleting an account should properly remove the user's private journal
+data and associated storage files according to the chosen deletion
+policy.
+
+Do NOT confuse:
+
+Trading Account deletion
+
+with
+
+Google/User Account deletion.
+
+These must be separate actions.
+
+==================================================
+26. FIREBASE CONFIGURATION
+==================================================
+
+Set up:
+
+Firebase project
+Firebase Authentication
+Google provider
+Firestore Database
+Firebase Storage
+
+Use environment variables for Firebase configuration where appropriate.
+
+Do NOT hardcode private server credentials.
+
+Provide an:
+
+.env.example
+
+file showing required configuration variable names without exposing
+real secrets.
+
+==================================================
+27. DATABASE INDEXES
+==================================================
+
+Create required Firestore indexes for common queries such as:
+
+Trades by date
+Trades by account
+Trades by strategy
+Trades by pair
+Trades by outcome
+Trades by news event
+
+Optimize queries to minimize unnecessary Firestore reads.
+
+==================================================
+28. LOADING EXPERIENCE
+==================================================
+
+When user logs in:
+
+Do not show:
+
+0 Trades
+$0 P/L
+0% Win Rate
+
+while their actual data is still loading.
+
+Instead show skeleton loaders.
+
+Once Firestore data has loaded, show real analytics.
+
+==================================================
+29. OFFLINE / CONNECTION HANDLING
+==================================================
+
+Detect connectivity issues.
+
+If appropriate, enable Firestore offline persistence.
+
+Clearly distinguish:
+
+Saved to cloud
+
+from
+
+Pending synchronization
+
+Never tell the user data is permanently saved if the cloud write
+actually failed.
+
+==================================================
+30. MOBILE GOOGLE LOGIN
+==================================================
+
+Google authentication must work properly on:
+
+Chrome Android
+Safari iPhone
+Desktop Chrome
+Desktop Edge
+Other modern browsers
+
+Use the appropriate Firebase authentication flow for responsive web.
+
+Test authentication on mobile layouts.
+
+==================================================
+31. SECURITY TESTING
+==================================================
+
+Before considering the application complete, perform this test:
+
+Create Google Account A.
+
+Login as A.
+
+Create:
+- Account
+- Strategy
+- Trade
+- Screenshot
+
+Logout.
+
+Login as Google Account B.
+
+Verify B CANNOT:
+
+See A's trades.
+See A's screenshots.
+See A's strategies.
+See A's analytics.
+Access A's Firestore documents.
+Access A's Storage files.
+
+Create data for B.
+
+Logout.
+
+Login as A again.
+
+Verify all A's original data still exists.
+
+Then test the same account across two devices.
+
+==================================================
+32. REQUIRED FINAL WORKFLOW
+==================================================
+
+The final application must support:
+
+Open Trading Journal
+        ↓
+Continue with Google
+        ↓
+Google Authentication
+        ↓
+Dashboard
+        ↓
+Create Trading Account
+        ↓
+Add Trade
+        ↓
+Upload Chart Screenshot
+        ↓
+Save
+        ↓
+Firestore stores trade
+        ↓
+Firebase Storage stores screenshot
+        ↓
+Journal updates
+        ↓
+Calendar updates
+        ↓
+Gallery updates
+        ↓
+Analytics updates
+        ↓
+Logout
+        ↓
+Close application
+        ↓
+Return later
+        ↓
+Continue with SAME Google account
+        ↓
+ALL PREVIOUS DATA IS RESTORED
+
+==================================================
+ABSOLUTE REQUIREMENTS
+==================================================
+
+1. Use real persistent cloud storage.
+2. Implement Google authentication.
+3. Every user's data must be isolated.
+4. Firebase UID determines ownership.
+5. Protect data using Firestore Security Rules.
+6. Protect screenshots using Storage Security Rules.
+7. Never rely solely on frontend filtering for security.
+8. Trades must survive logout/browser closing.
+9. Same Google account must work across devices.
+10. Different Google accounts must have completely separate data.
+11. Screenshots must be permanently stored and linked to trades.
+12. Analytics must only use the logged-in user's data.
+13. Logout must NOT delete data.
+14. All CRUD operations must work.
+15. Build this as a real application, not a frontend prototype.
+
+Do not mark the project complete until authentication, database persistence,
+per-user isolation, screenshot storage, security rules, logout/login
+persistence and multi-device synchronization have all been tested.
