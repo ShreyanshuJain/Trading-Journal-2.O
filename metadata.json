@@ -1,0 +1,6 @@
+{
+  "name": "Trading Journal",
+  "description": "A professional dark-mode trading journal and analytics dashboard for tracking trades, screenshots, account equity, and performance metrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

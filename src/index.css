@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #0D0F12;
+    color: #F5F5F5;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0D0F12;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #292D33;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3F444E;
+}
+
+/* Light Theme Overrides */
+html.light, body.light {
+  background-color: #F3F4F6 !important;
+  color: #0F172A !important;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: #F3F4F6;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Background overrides in Light Mode */
+.light .bg-\[\#0D0F12\] {
+  background-color: #F3F4F6 !important;
+}
+
+.light .bg-\[\#15181D\] {
+  background-color: #FFFFFF !important;
+}
+
+.light .bg-\[\#1B1F24\] {
+  background-color: #F8FAFC !important;
+}
+
+.light .bg-\[\#292D33\] {
+  background-color: #E2E8F0 !important;
+}
+
+.light .bg-\[\#0D0F12\]\/50 {
+  background-color: rgba(243, 244, 246, 0.5) !important;
+}
+
+.light .bg-\[\#1B1F24\]\/50 {
+  background-color: rgba(248, 250, 252, 0.7) !important;
+}
+
+.light .bg-\[\#15181D\]\/50 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.light .border-\[\#292D33\] {
+  border-color: #E2E8F0 !important;
+}
+
+.light .divide-\[\#292D33\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #E2E8F0 !important;
+}
+
+/* Text color overrides in Light Mode */
+.light .text-\[\#F5F5F5\] {
+  color: #0F172A !important;
+}
+
+.light .text-\[\#A0A6AE\] {
+  color: #475569 !important;
+}
+
+.light .text-\[\#6F7680\] {
+  color: #64748B !important;
+}
+
+/* Hover overrides in Light Mode */
+.light .hover\:bg-\[\#1B1F24\]\/50:hover {
+  background-color: #F1F5F9 !important;
+}
+
+.light .hover\:bg-\[\#22272E\]:hover {
+  background-color: #E2E8F0 !important;
+}
+
+.light .hover\:bg-\[\#292D33\]:hover {
+  background-color: #E2E8F0 !important;
+}
+
+.light .hover\:text-\[\#F5F5F5\]:hover {
+  color: #0F172A !important;
+}
+
+/* Input / Select form fields in Light Mode */
+.light input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.light select,
+.light textarea {
+  color: #0F172A !important;
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+/* Active navigation item styling in Light Mode */
+.light .bg-\[\#1B1F24\].text-white {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
