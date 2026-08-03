@@ -32,20 +32,40 @@
     }
   ],
   "tags": [
-    { "id": "tag_1", "name": "A+ Setup", "color": "#10B981" },
-    { "id": "tag_2", "name": "News Event", "color": "#F59E0B" },
-    { "id": "tag_3", "name": "FOMO Entry", "color": "#EC4899" },
-    { "id": "tag_4", "name": "Disciplined Execution", "color": "#8B5CF6" }
+    {
+      "id": "tag_1",
+      "name": "A+ Setup",
+      "color": "#10B981"
+    },
+    {
+      "id": "tag_2",
+      "name": "News Event",
+      "color": "#F59E0B"
+    },
+    {
+      "id": "tag_3",
+      "name": "FOMO Entry",
+      "color": "#EC4899"
+    },
+    {
+      "id": "tag_4",
+      "name": "Disciplined Execution",
+      "color": "#8B5CF6"
+    }
   ],
   "settings": {
     "defaultAccountId": "acc_main",
     "baseCurrency": "USD",
     "timezone": "America/New_York",
-    "defaultRiskPercent": 1.0,
-    "maxRiskPercent": 2.0,
-    "dailyLossLimit": 1000,
-    "weeklyLossLimit": 3000,
+    "defaultRiskPercent": 1,
+    "maxRiskPercent": 2,
+    "maxDailyLossPercent": 5,
+    "maxDrawdownPercent": 10,
+    "maxConsecutiveLosses": 3,
+    "defaultLotSize": 1,
+    "defaultCommission": 0,
+    "enableNotifications": true,
     "theme": "dark"
   },
-  "updatedAt": "2026-08-02T23:10:00.000Z"
+  "updatedAt": "2026-08-03T12:54:08.441Z"
 }
