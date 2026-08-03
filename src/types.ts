@@ -25,7 +25,8 @@ export type ScreenshotCategory =
 
 export interface TradeScreenshot {
   id: string;
-  url: string;
+  url: string;            // Firebase Storage download URL (or base64 during upload)
+  storagePath?: string;   // Firebase Storage path for deletion
   caption?: string;
   category: ScreenshotCategory;
   createdAt: string;
@@ -96,7 +97,7 @@ export interface Account {
   name: string;
   broker: string;
   startingBalance: number;
-  currentBalance: number;
+  currentBalance: number; // Computed from trades; not persisted to Firestore
   currency: string;
   type: 'Personal' | 'Demo' | 'Funded' | 'Live';
 }
@@ -105,7 +106,7 @@ export interface Strategy {
   id: string;
   name: string;
   description: string;
-  color: string; // hex or color name
+  color: string;
 }
 
 export interface Tag {
@@ -214,7 +215,7 @@ export interface SessionPerformance {
 }
 
 export interface DayOfWeekPerformance {
-  day: string; // 'Monday', 'Tuesday', ...
+  day: string;
   totalTrades: number;
   wins: number;
   losses: number;

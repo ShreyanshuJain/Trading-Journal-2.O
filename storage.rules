@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // User-scoped screenshot storage
+    match /users/{uid}/trades/{tradeId}/{allPaths=**} {
+      // Read: only the authenticated owner
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // Write (upload/delete): only the authenticated owner, images only, max 10 MB
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && (request.resource == null                         // allow delete
+            || (request.resource.contentType.matches('image/(jpeg|png|webp)')
+                && request.resource.size <= 10 * 1024 * 1024));
+    }
+  }
+}

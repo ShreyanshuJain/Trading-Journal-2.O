@@ -215,7 +215,7 @@ export const SettingsView: React.FC = () => {
                     <div>
                       <h4 className="font-bold text-[#F5F5F5] text-sm">{acc.name}</h4>
                       <p className="text-xs text-[#A0A6AE]">
-                        Currency: {acc.currency} • Initial: ${(acc.initialBalance ?? 0).toLocaleString()}
+                        Currency: {acc.currency} • Starting: ${(acc.startingBalance ?? 0).toLocaleString()}
                       </p>
                     </div>
 

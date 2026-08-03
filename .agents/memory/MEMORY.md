@@ -1,0 +1,2 @@
+- [Firebase Firestore architecture](firebase-firestore-arch.md) — per-user subcollections; currentBalance computed in React to avoid circular Firestore writes
+- [Vite env type declarations](vite-env-types.md) — `import.meta.env` requires `src/vite-env.d.ts` with `/// <reference types="vite/client" />`
