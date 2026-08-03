@@ -61,8 +61,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         { merge: true }
       );
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setAuthError('Google sign-in failed. Please try again.');
+      console.error('Firebase auth error:', err.code, err.message);
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        // user dismissed, no error shown
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setAuthError('This domain is not authorized in Firebase. Add it to Firebase Console → Authentication → Settings → Authorized domains.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setAuthError('Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Sign-in method → Google.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setAuthError('Pop-up was blocked by your browser. Please allow pop-ups for this site and try again.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setAuthError('Network error. Check your internet connection and try again.');
+      } else {
+        setAuthError(`Sign-in failed (${err.code ?? 'unknown'}). Check the browser console for details.`);
       }
     }
   };
