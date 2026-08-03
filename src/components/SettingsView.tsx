@@ -215,14 +215,14 @@ export const SettingsView: React.FC = () => {
                     <div>
                       <h4 className="font-bold text-[#F5F5F5] text-sm">{acc.name}</h4>
                       <p className="text-xs text-[#A0A6AE]">
-                        Currency: {acc.currency} • Initial: ${acc.initialBalance.toLocaleString()}
+                        Currency: {acc.currency} • Initial: ${(acc.initialBalance ?? 0).toLocaleString()}
                       </p>
                     </div>
 
                     <div className="text-right">
                       <span className="text-xs text-[#6F7680] uppercase block font-semibold">Current Balance</span>
                       <span className="text-base font-bold text-emerald-400">
-                        ${acc.currentBalance.toLocaleString()}
+                        ${(acc.currentBalance ?? 0).toLocaleString()}
                       </span>
                     </div>
                   </div>
