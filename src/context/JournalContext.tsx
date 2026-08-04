@@ -6,7 +6,7 @@ import {
   setDoc,
   deleteDoc,
   getDocs,
-} from 'firebase/firestore';
+} from '../firebase/realtime';
 import {
   ref as storageRef,
   uploadString,
@@ -138,7 +138,7 @@ interface JournalContextType {
 
 const JournalContext = createContext<JournalContextType | undefined>(undefined);
 
-// ── Firestore helpers ─────────────────────────────────────────────────────────
+// ── Realtime Database helpers ─────────────────────────────────────────────────
 
 /** Upload a base64 screenshot to Firebase Storage; returns updated screenshot with permanent URL */
 async function uploadScreenshot(userId: string, tradeId: string, screenshot: TradeScreenshot): Promise<TradeScreenshot> {
@@ -159,8 +159,8 @@ async function deleteStorageFile(storagePath: string) {
   }
 }
 
-/** Strip undefined values (Firestore rejects them) */
-function cleanForFirestore<T extends object>(obj: T): T {
+/** Strip undefined values before writing to Realtime Database */
+function cleanForRealtimeDatabase<T extends object>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
@@ -183,7 +183,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   const [isSaving, setIsSaving] = useState(false);
 
   // ── Data state ─────────────────────────────────────────────────────────────
-  // rawAccounts: stored in Firestore (no computed currentBalance)
+  // rawAccounts: stored in Realtime Database (no computed currentBalance)
   const [rawAccounts, setRawAccounts] = useState<Omit<Account, 'currentBalance'>[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
@@ -208,7 +208,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     }
   }, [settings.theme]);
 
-  // ── Firestore real-time listeners ──────────────────────────────────────────
+  // ── Realtime Database listeners ────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
 
@@ -229,7 +229,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     // Trades
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'trades'), (snap) => {
-        setTrades(snap.docs.map((d) => d.data() as Trade));
+        setTrades(snap.docs.map((d) => d.data() as unknown as Trade));
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
       })
     );
@@ -237,7 +237,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     // Strategies
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'strategies'), (snap) => {
-        setStrategies(snap.docs.map((d) => d.data() as Strategy));
+        setStrategies(snap.docs.map((d) => d.data() as unknown as Strategy));
         if (!loaded.strategies) { loaded.strategies = true; checkDone(); }
       })
     );
@@ -245,7 +245,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     // Tags
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'tags'), (snap) => {
-        setTags(snap.docs.map((d) => d.data() as Tag));
+        setTags(snap.docs.map((d) => d.data() as unknown as Tag));
         if (!loaded.tags) { loaded.tags = true; checkDone(); }
       })
     );
@@ -254,7 +254,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     unsubscribers.push(
       onSnapshot(doc(db, 'users', userId, 'settings', 'preferences'), (snap) => {
         if (snap.exists()) {
-          setSettings(snap.data() as UserSettings);
+          setSettings(snap.data() as unknown as UserSettings);
         }
         if (!loaded.settings) { loaded.settings = true; checkDone(); }
       })
@@ -387,7 +387,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
         (tradeData.screenshots || []).map((s) => uploadScreenshot(userId, tradeId, s))
       );
 
-      const newTrade: Trade = cleanForFirestore({
+      const newTrade: Trade = cleanForRealtimeDatabase({
         ...tradeData,
         screenshots: processedScreenshots,
         id: tradeId,
@@ -419,7 +419,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
         screenshots.map((s) => uploadScreenshot(userId, id, s))
       );
 
-      const updated = cleanForFirestore({
+      const updated = cleanForRealtimeDatabase({
         ...(existing || {}),
         ...updatedFields,
         screenshots,
@@ -445,7 +445,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     const newId = `trd_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
     // Duplicate without Storage screenshots (avoid re-uploading)
-    const newTrade: Trade = cleanForFirestore({
+    const newTrade: Trade = cleanForRealtimeDatabase({
       ...original,
       id: newId,
       userId,
@@ -472,7 +472,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     showToast('Deleting…');
 
     try {
-      // Delete Firestore document
+      // Delete Realtime Database record
       await deleteDoc(doc(db, 'users', userId, 'trades', id));
 
       // Delete associated screenshots from Storage
@@ -497,7 +497,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       const tradeSnap = await getDocs(collection(db, 'users', userId, 'trades'));
       await Promise.all(
         tradeSnap.docs.map(async (d) => {
-          const trade = d.data() as Trade;
+          const trade = d.data() as unknown as Trade;
           if (trade.screenshots) {
             await Promise.all(
               trade.screenshots.filter((s) => s.storagePath).map((s) => deleteStorageFile(s.storagePath!))

@@ -1,0 +1,17 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "trades": {
+          "$tradeId": {
+            ".validate": "newData.hasChildren(['id', 'userId']) && newData.child('userId').val() === $uid"
+          }
+        }
+      }
+    }
+  }
+}

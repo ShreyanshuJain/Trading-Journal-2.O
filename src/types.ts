@@ -97,7 +97,7 @@ export interface Account {
   name: string;
   broker: string;
   startingBalance: number;
-  currentBalance: number; // Computed from trades; not persisted to Firestore
+  currentBalance: number; // Computed from trades; not persisted to Realtime Database
   currency: string;
   type: 'Personal' | 'Demo' | 'Funded' | 'Live';
 }

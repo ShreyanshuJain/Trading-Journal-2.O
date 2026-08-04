@@ -1,12 +1,12 @@
 # Trading Journal
 
-A professional, multi-user trading journal web app built with React + TypeScript, Vite, Express, Firebase Authentication, Firestore, and Firebase Storage.
+A professional, multi-user trading journal web app built with React + TypeScript, Vite, Express, Firebase Authentication, Realtime Database, and Firebase Storage.
 
 ## Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS v4, Recharts, Framer Motion, Lucide icons
 - **Auth**: Firebase Authentication (Google Sign-In)
-- **Database**: Firebase Firestore (per-user, real-time)
+- **Database**: Firebase Realtime Database (per-user, real-time)
 - **Storage**: Firebase Storage (trade screenshots)
 - **Server**: Express + Vite dev middleware (port 5000)
 
@@ -35,13 +35,13 @@ Project: `trading-journal-f8d1a`
 ```
 User opens app → LoginPage (if not authenticated)
   → "Continue with Google" → Firebase Google OAuth
-  → User profile upserted in Firestore users/{uid}
+  → User profile upserted in Realtime Database users/{uid}
   → JournalProvider mounts with userId
-  → Firestore real-time listeners load user's data
+  → Realtime Database listeners load user's data
   → Dashboard rendered
 ```
 
-### Firestore data structure
+### Realtime Database data structure
 ```
 users/{uid}                        ← user profile
 users/{uid}/trades/{tradeId}       ← individual trades
@@ -57,19 +57,19 @@ users/{uid}/trades/{tradeId}/{screenshotId}   ← trade screenshots
 ```
 
 ### Security
-- Firestore rules: `firestore.rules` — only owner (matching uid) can read/write
+- Realtime Database rules: `database.rules.json` — only owner (matching uid) can read/write
 - Storage rules: `storage.rules` — only owner can access; images only; max 10 MB
 
 ### Key files
 - `src/firebase/config.ts` — Firebase initialization
 - `src/context/AuthContext.tsx` — Google auth state, signInWithGoogle, logout
-- `src/context/JournalContext.tsx` — All journal state + Firestore CRUD
+- `src/context/JournalContext.tsx` — All journal state + Realtime Database CRUD
 - `src/components/LoginPage.tsx` — Login UI
 - `src/components/LoadingScreen.tsx` — Skeleton while auth/data loads
 - `src/components/UserMenu.tsx` — User profile dropdown (sidebar footer)
 
 ### Data isolation
-Every CRUD operation uses the authenticated `userId`. `currentBalance` for accounts is computed from trades in React (not stored in Firestore) to avoid circular updates.
+Every CRUD operation uses the authenticated `userId`. `currentBalance` for accounts is computed from trades in React (not stored in Realtime Database) to avoid circular updates.
 
 ## User preferences
 

@@ -6,8 +6,8 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
+import { doc, setDoc } from '../firebase/realtime';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Upsert user profile in Firestore
+      // Upsert user profile in Realtime Database
       await setDoc(
         doc(db, 'users', user.uid),
         {
@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           displayName: user.displayName,
           email: user.email,
           photoURL: user.photoURL,
-          lastLoginAt: serverTimestamp(),
+          lastLoginAt: new Date().toISOString(),
         },
         { merge: true }
       );
@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Set createdAt only on first login
       await setDoc(
         doc(db, 'users', user.uid),
-        { createdAt: serverTimestamp() },
+        { createdAt: new Date().toISOString() },
         { merge: true }
       );
     } catch (err: any) {
