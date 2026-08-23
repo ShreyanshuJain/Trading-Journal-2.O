@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useJournal } from '../context/JournalContext';
 import { HeaderBar } from './HeaderBar';
+import { uploadToCloudinary } from '../utils/imageUtils';
 import {
   Wallet,
   Layers,
@@ -12,6 +13,12 @@ import {
   Trash2,
   Check,
   Settings as SettingsIcon,
+  Cloud,
+  ExternalLink,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -27,9 +34,18 @@ export const SettingsView: React.FC = () => {
     exportDataCSV,
     importDataJSON,
     resetToDemoData,
+    showToast,
   } = useJournal();
 
-  const [activeTab, setActiveTab] = useState<'accounts' | 'strategies' | 'risk' | 'data'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'strategies' | 'risk' | 'cloudinary' | 'data'>('accounts');
+
+  // Cloudinary State
+  const [cloudName, setCloudName] = useState<string>(settings.cloudinaryCloudName || 'bgowyyl2');
+  const [apiKey, setApiKey] = useState<string>(settings.cloudinaryApiKey || '124251242856859');
+  const [apiSecret, setApiSecret] = useState<string>(settings.cloudinaryApiSecret || '');
+  const [uploadPreset, setUploadPreset] = useState<string>(settings.cloudinaryUploadPreset || '');
+  const [isTestingCloudinary, setIsTestingCloudinary] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; url?: string } | null>(null);
 
   // New Account State
   const [newAccName, setNewAccName] = useState<string>('');
@@ -79,7 +95,62 @@ export const SettingsView: React.FC = () => {
       maxDrawdownPercent: maxDrawdown,
       maxConsecutiveLosses,
     });
-    alert('Risk management parameters updated successfully!');
+    showToast('Risk limits saved');
+  };
+
+  const handleSaveCloudinary = () => {
+    updateSettings({
+      cloudinaryCloudName: cloudName.trim(),
+      cloudinaryApiKey: apiKey.trim(),
+      cloudinaryApiSecret: apiSecret.trim(),
+      cloudinaryUploadPreset: uploadPreset.trim(),
+    });
+    showToast('✓ Cloudinary settings saved');
+  };
+
+  const handleTestCloudinary = async () => {
+    const cName = cloudName.trim();
+    const aKey = apiKey.trim();
+    const aSecret = apiSecret.trim();
+    const preset = uploadPreset.trim();
+
+    if (!cName) {
+      setTestResult({
+        success: false,
+        message: 'Please enter your Cloudinary Cloud Name.',
+      });
+      return;
+    }
+
+    if (!aSecret && !preset) {
+      setTestResult({
+        success: false,
+        message: 'Please enter either your Cloudinary API Secret (for backend uploads) or an Unsigned Upload Preset.',
+      });
+      return;
+    }
+
+    setIsTestingCloudinary(true);
+    setTestResult(null);
+
+    try {
+      // 1x1 transparent PNG for lightweight verification
+      const testBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const url = await uploadToCloudinary(testBase64, cName, preset, aKey, aSecret);
+      setTestResult({
+        success: true,
+        message: 'Cloudinary upload verified successfully! Chart screenshots will now be uploaded to your Cloudinary cloud.',
+        url,
+      });
+      showToast('✓ Cloudinary connected');
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err?.message || 'Failed to upload test image. Please check your credentials.',
+      });
+    } finally {
+      setIsTestingCloudinary(false);
+    }
   };
 
   const handleJSONImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,6 +218,18 @@ export const SettingsView: React.FC = () => {
           >
             <ShieldAlert className="w-4 h-4" />
             <span>Risk Management Rules</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('cloudinary')}
+            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'cloudinary'
+                ? 'bg-emerald-600 text-white'
+                : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
+            }`}
+          >
+            <Cloud className="w-4 h-4" />
+            <span>Cloudinary Image Storage</span>
           </button>
 
           <button
@@ -364,7 +447,171 @@ export const SettingsView: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: DATA EXPORT & IMPORT */}
+        {/* TAB 4: CLOUDINARY IMAGE STORAGE */}
+        {activeTab === 'cloudinary' && (
+          <div className="space-y-6">
+            <div className="bg-[#15181D] border border-[#292D33] rounded-xl p-6 space-y-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-bold text-[#F5F5F5] text-base flex items-center gap-2">
+                    <Cloud className="w-5 h-5 text-emerald-400" />
+                    <span>Cloudinary Direct Image Storage</span>
+                  </h3>
+                  <p className="text-xs text-[#A0A6AE] mt-1">
+                    Store high-resolution chart screenshots on Cloudinary's fast global CDN. Free tier gives ~25GB of free storage with zero bandwidth limits.
+                  </p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 ${
+                  cloudName && uploadPreset
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${cloudName && uploadPreset ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  {cloudName && uploadPreset ? 'Configured' : 'Using Local Storage'}
+                </span>
+              </div>
+
+              {/* Step-by-step Setup Guide */}
+              <div className="bg-[#1B1F24] border border-[#292D33] rounded-lg p-4 space-y-3">
+                <h4 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">1</span>
+                  Quick 1-Minute Setup Instructions
+                </h4>
+                <ol className="text-xs text-[#A0A6AE] space-y-2 list-decimal list-inside leading-relaxed">
+                  <li>
+                    Create a free account at{' '}
+                    <a
+                      href="https://cloudinary.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-400 hover:underline inline-flex items-center gap-0.5"
+                    >
+                      cloudinary.com <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </li>
+                  <li>Copy your <strong>Cloud Name</strong> from the Cloudinary Dashboard (e.g. <code className="text-emerald-400 bg-black/40 px-1 py-0.5 rounded">my-trading-cloud</code>).</li>
+                  <li>
+                    In Cloudinary, go to <strong>Settings</strong> &rarr; <strong>Upload</strong> &rarr; scroll down to <strong>Upload presets</strong> &rarr; click <strong>Add upload preset</strong>.
+                  </li>
+                  <li>
+                    Set <strong>Signing Mode</strong> to <span className="text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Unsigned</span> and save. Copy the <strong>Upload preset name</strong>.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Form Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#A0A6AE]">
+                    Cloudinary Cloud Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. bgowyyl2"
+                    value={cloudName}
+                    onChange={(e) => setCloudName(e.target.value)}
+                    className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] text-xs rounded-lg px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#A0A6AE]">
+                    API Key
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 124251242856859"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] text-xs rounded-lg px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#A0A6AE]">
+                    API Secret <span className="text-emerald-400 text-[10px]">(for secure server uploads)</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Paste your Cloudinary API Secret here"
+                    value={apiSecret}
+                    onChange={(e) => setApiSecret(e.target.value)}
+                    className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] text-xs rounded-lg px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#A0A6AE]">
+                    Unsigned Upload Preset <span className="text-[10px] text-gray-500">(Optional if API Secret provided)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. trading_charts_preset"
+                    value={uploadPreset}
+                    onChange={(e) => setUploadPreset(e.target.value)}
+                    className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] text-xs rounded-lg px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Test Result Message */}
+              {testResult && (
+                <div className={`p-3.5 rounded-lg text-xs flex items-start gap-2.5 border ${
+                  testResult.success
+                    ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300'
+                    : 'bg-red-950/30 border-red-500/30 text-red-300'
+                }`}>
+                  {testResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="font-medium">{testResult.message}</p>
+                    {testResult.url && (
+                      <p className="text-[11px] text-emerald-400/80 font-mono break-all">
+                        Verified URL: {testResult.url}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveCloudinary}
+                  className="py-2.5 px-5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-600/20"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save Cloudinary Credentials</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTestCloudinary}
+                  disabled={isTestingCloudinary || !cloudName.trim() || !uploadPreset.trim()}
+                  className="py-2.5 px-4 rounded-lg bg-[#1B1F24] border border-[#292D33] hover:bg-[#292D33] disabled:opacity-50 text-[#F5F5F5] font-bold text-xs flex items-center gap-2 cursor-pointer transition-all"
+                >
+                  {isTestingCloudinary ? (
+                    <>
+                      <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                      <span>Testing Upload…</span>
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-4 h-4 text-emerald-400" />
+                      <span>Test Upload Connection</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: DATA EXPORT & IMPORT */}
         {activeTab === 'data' && (
           <div className="space-y-6">
             <div className="bg-[#15181D] border border-[#292D33] rounded-xl p-6 space-y-4">

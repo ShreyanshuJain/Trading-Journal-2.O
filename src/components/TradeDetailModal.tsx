@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useJournal } from '../context/JournalContext';
-import { Trade } from '../types';
+import { Trade, TradeScreenshot } from '../types';
+import { optimizeImageFile, uploadScreenshotImage } from '../utils/imageUtils';
+import { generateTradingChartSVG } from '../utils/chartSvgGenerator';
 import {
   X,
   Edit2,
@@ -16,6 +18,9 @@ import {
   Calendar,
   Layers,
   Award,
+  Upload,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 export const TradeDetailModal: React.FC = () => {
@@ -25,12 +30,16 @@ export const TradeDetailModal: React.FC = () => {
     setEditingTrade,
     duplicateTrade,
     deleteTrade,
+    updateTrade,
     strategies,
     accounts,
+    settings,
   } = useJournal();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'screenshots' | 'review' | 'news'>('overview');
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!selectedTradeDetail) return null;
 
@@ -41,6 +50,88 @@ export const TradeDetailModal: React.FC = () => {
   const isWin = trade.outcome === 'WIN';
   const isLoss = trade.outcome === 'LOSS';
   const isBE = trade.outcome === 'BREAKEVEN';
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const newScreenshots: TradeScreenshot[] = [...(trade.screenshots || [])];
+      const fileList = Array.from(files) as File[];
+      for (const file of fileList) {
+        if (!file.type.startsWith('image/')) continue;
+        const optimizedUrl = await optimizeImageFile(file);
+        let finalUrl = optimizedUrl;
+        try {
+          finalUrl = await uploadScreenshotImage(
+            optimizedUrl,
+            settings?.cloudinaryCloudName,
+            settings?.cloudinaryUploadPreset,
+            settings?.cloudinaryApiKey,
+            settings?.cloudinaryApiSecret
+          );
+        } catch (uErr) {
+          console.warn('Upload fallback to optimized base64:', uErr);
+        }
+        newScreenshots.push({
+          id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          url: finalUrl,
+          caption: `${trade.symbol} Chart Screenshot`,
+          category: 'Entry',
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      const updated = { ...trade, screenshots: newScreenshots };
+      await updateTrade(updated);
+      setSelectedTradeDetail(updated);
+    } catch (err) {
+      console.error('Failed to attach screenshot:', err);
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleGenerateAutoChart = async () => {
+    setIsUploading(true);
+    try {
+      const chartUrl = generateTradingChartSVG({
+        symbol: trade.symbol,
+        direction: trade.direction,
+        outcome: trade.outcome,
+        entryPrice: trade.entry,
+        stopLossPrice: trade.stopLoss,
+        takeProfitPrice: trade.takeProfit,
+      });
+
+      const newScr: TradeScreenshot = {
+        id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        url: chartUrl,
+        caption: `${trade.symbol} Auto Generated Analysis Chart`,
+        category: 'Entry',
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = { ...trade, screenshots: [...(trade.screenshots || []), newScr] };
+      await updateTrade(updated);
+      setSelectedTradeDetail(updated);
+    } catch (err) {
+      console.error('Failed to generate auto chart:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteScreenshot = async (scrId: string) => {
+    const updated = {
+      ...trade,
+      screenshots: (trade.screenshots || []).filter((s) => s.id !== scrId),
+    };
+    await updateTrade(updated);
+    setSelectedTradeDetail(updated);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -289,26 +380,104 @@ export const TradeDetailModal: React.FC = () => {
 
           {activeTab === 'screenshots' && (
             <div className="space-y-4">
+              {/* Action bar */}
+              <div className="flex items-center justify-between bg-[#1B1F24] p-3 rounded-xl border border-[#292D33]">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-[#F5F5F5]">
+                    Attached Screenshots ({trade.screenshots?.length || 0})
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateAutoChart}
+                    disabled={isUploading}
+                    className="py-1.5 px-2.5 rounded-lg bg-[#292D33] hover:bg-[#323740] text-[#F5F5F5] text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Auto Chart</span>
+                  </button>
+
+                  <label className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all">
+                    {isUploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isUploading ? 'Processing...' : 'Upload Image'}</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
               {!trade.screenshots || trade.screenshots.length === 0 ? (
-                <div className="p-12 text-center text-[#6F7680] border-2 border-dashed border-[#292D33] rounded-xl">
-                  <ImageIcon className="w-8 h-8 mx-auto mb-2 text-[#6F7680]" />
-                  <p className="text-xs font-semibold text-[#A0A6AE]">No chart screenshots attached to this trade.</p>
+                <div className="p-10 text-center text-[#6F7680] border-2 border-dashed border-[#292D33] rounded-xl space-y-3">
+                  <ImageIcon className="w-8 h-8 mx-auto text-[#6F7680]" />
+                  <div>
+                    <p className="text-xs font-semibold text-[#A0A6AE]">No chart screenshots attached to this trade yet.</p>
+                    <p className="text-[11px] text-[#6F7680] mt-1">Upload a trade chart screenshot or click Auto Chart above.</p>
+                  </div>
+                  <div className="flex justify-center gap-2 pt-2">
+                    <button
+                      onClick={handleGenerateAutoChart}
+                      className="px-3 py-1.5 rounded-lg bg-[#292D33] hover:bg-[#323740] text-emerald-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Auto Generate Chart</span>
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Image</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {trade.screenshots.map((scr) => (
                     <div
                       key={scr.id}
-                      className="bg-[#1B1F24] border border-[#292D33] rounded-xl p-3 space-y-2 group"
+                      className="bg-[#1B1F24] border border-[#292D33] rounded-xl p-3 space-y-2 group relative"
                     >
                       <div className="relative aspect-video rounded-lg overflow-hidden bg-[#0D0F12]">
-                        <img src={scr.url} alt={scr.caption} className="w-full h-full object-cover" />
-                        <button
+                        <img
+                          src={scr.url}
+                          alt={scr.caption || 'Screenshot'}
+                          className="w-full h-full object-cover cursor-pointer"
                           onClick={() => setFullscreenImage(scr.url)}
-                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer text-white"
-                        >
-                          <Maximize2 className="w-6 h-6" />
-                        </button>
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-all pointer-events-none">
+                          <button
+                            type="button"
+                            onClick={() => setFullscreenImage(scr.url)}
+                            className="p-2 rounded-lg bg-black/70 text-white hover:bg-black pointer-events-auto cursor-pointer"
+                            title="Fullscreen View"
+                          >
+                            <Maximize2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteScreenshot(scr.id)}
+                            className="p-2 rounded-lg bg-black/70 text-red-400 hover:bg-red-600 hover:text-white pointer-events-auto cursor-pointer"
+                            title="Delete Screenshot"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between text-xs">

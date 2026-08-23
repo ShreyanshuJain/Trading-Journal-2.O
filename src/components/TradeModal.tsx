@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useJournal } from '../context/JournalContext';
 import {
   Trade,
@@ -13,6 +13,12 @@ import {
 import { calculatePlannedRR, calculateRealizedRR } from '../utils/calculations';
 import { generateTradingChartSVG } from '../utils/chartSvgGenerator';
 import {
+  optimizeImageFile,
+  isValidImageUrl,
+  extractImageFilesFromClipboard,
+  uploadScreenshotImage,
+} from '../utils/imageUtils';
+import {
   X,
   Plus,
   Trash2,
@@ -23,6 +29,11 @@ import {
   AlertCircle,
   HelpCircle,
   Image as ImageIcon,
+  Link as LinkIcon,
+  Loader2,
+  CheckCircle2,
+  Sparkles,
+  Maximize2,
 } from 'lucide-react';
 
 interface TradeModalProps {
@@ -39,6 +50,8 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
     addTrade,
     updateTrade,
     addStrategy,
+    activeAccountId,
+    settings,
   } = useJournal();
 
   const [activeTab, setActiveTab] = useState<'execution' | 'risk' | 'screenshots' | 'news' | 'psychology' | 'tags'>(
@@ -51,8 +64,8 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
   const [symbol, setSymbol] = useState<string>('XAUUSD');
   const [direction, setDirection] = useState<TradeDirection>('BUY');
   const [session, setSession] = useState<TradingSession>('New York');
-  const [accountId, setAccountId] = useState<string>(accounts[0]?.id || '');
-  const [strategyId, setStrategyId] = useState<string>(strategies[0]?.id || '');
+  const [accountId, setAccountId] = useState<string>('');
+  const [strategyId, setStrategyId] = useState<string>('');
   const [setup, setSetup] = useState<string>('');
 
   // New Strategy Creation
@@ -88,6 +101,13 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
 
   // Screenshots
   const [screenshots, setScreenshots] = useState<TradeScreenshot[]>([]);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [imageUrlInput, setImageUrlInput] = useState<string>('');
+  const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
+  const [isProcessingImage, setIsProcessingImage] = useState<boolean>(false);
+  const [pasteNotice, setPasteNotice] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // News Fields
   const [newsEvent, setNewsEvent] = useState<string>('');
@@ -167,7 +187,8 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
       setSymbol('XAUUSD');
       setDirection('BUY');
       setSession('New York');
-      setAccountId(accounts[0]?.id || '');
+      const targetAccId = activeAccountId !== 'all' ? activeAccountId : accounts[0]?.id || '';
+      setAccountId(targetAccId);
       setStrategyId(strategies[0]?.id || '');
       setSetup('');
       setEntryInput('');
@@ -184,7 +205,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
       setSelectedTags(['A+ Setup']);
       setManualOverride(false);
     }
-  }, [tradeToEdit, isOpen]);
+  }, [tradeToEdit, isOpen, activeAccountId, accounts, strategies]);
 
   // Handle manual PnL input
   const handleNetPLChange = (valStr: string) => {
@@ -216,24 +237,24 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
   // Ensure accountId and strategyId always match available options
   useEffect(() => {
     if (accounts.length > 0 && (!accountId || !accounts.some((a) => a.id === accountId))) {
-      setAccountId(accounts[0].id);
+      const defaultId = activeAccountId !== 'all' && accounts.some((a) => a.id === activeAccountId)
+        ? activeAccountId
+        : accounts[0].id;
+      setAccountId(defaultId);
     }
     if (strategies.length > 0 && (!strategyId || !strategies.some((s) => s.id === strategyId))) {
       setStrategyId(strategies[0].id);
     }
-  }, [accounts, strategies, accountId, strategyId]);
+  }, [accounts, strategies, accountId, strategyId, activeAccountId]);
 
   // Automatic calculation updates
   useEffect(() => {
     if (manualOverride) return;
 
     if (!entryInput || !exitPriceInput || !lotSizeInput || entry === 0 || exitPrice === 0 || lotSize === 0) {
-      setNetPLInput('0');
-      setOutcome('BREAKEVEN');
       return;
     }
 
-    const plannedRRVal = calculatePlannedRR(entry, stopLoss, takeProfit);
     const realizedRRVal = calculateRealizedRR(entry, stopLoss, exitPrice, direction);
 
     // Auto calculate Net P/L
@@ -255,11 +276,11 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
     setNetPLInput(netResult.toString());
 
     // Auto outcome
-    if (realizedRRVal >= 0.2) {
+    if (realizedRRVal >= 0.2 || netResult > 0) {
       setOutcome('WIN');
-    } else if (realizedRRVal <= -0.8) {
+    } else if (realizedRRVal <= -0.8 || netResult < 0) {
       setOutcome('LOSS');
-    } else if (Math.abs(realizedRRVal) < 0.2) {
+    } else {
       setOutcome('BREAKEVEN');
     }
   }, [entryInput, stopLossInput, takeProfitInput, exitPriceInput, entry, stopLoss, takeProfit, exitPrice, direction, lotSizeInput, lotSize, commissionInput, commission, feesInput, fees, symbol, manualOverride]);
@@ -278,26 +299,114 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
     setShowNewStrategyInput(false);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  /** Process multiple image files with auto-compression & instant upload */
+  const processAndAddImageFiles = async (files: File[] | FileList) => {
+    const fileList = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (fileList.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const url = event.target?.result as string;
+    setIsProcessingImage(true);
+    try {
+      for (const file of fileList) {
+        // Optimize first to crisp WebP/JPEG
+        const optimizedDataUrl = await optimizeImageFile(file);
+
+        // Upload to universal upload endpoint (supports local server storage and Cloudinary)
+        let finalUrl = optimizedDataUrl;
+        try {
+          finalUrl = await uploadScreenshotImage(
+            optimizedDataUrl,
+            settings?.cloudinaryCloudName,
+            settings?.cloudinaryUploadPreset,
+            settings?.cloudinaryApiKey,
+            settings?.cloudinaryApiSecret
+          );
+        } catch (uErr) {
+          console.warn('Direct upload fallback:', uErr);
+        }
+
         const newScr: TradeScreenshot = {
-          id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-          url,
+          id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          url: finalUrl,
           caption: `${symbol} Chart Screenshot`,
           category: 'Entry',
           createdAt: new Date().toISOString(),
         };
         setScreenshots((prev) => [...prev, newScr]);
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+      setPasteNotice(`Attached ${fileList.length} image${fileList.length > 1 ? 's' : ''}`);
+      setTimeout(() => setPasteNotice(null), 3500);
+    } catch (err) {
+      console.error('Failed to process image:', err);
+    } finally {
+      setIsProcessingImage(false);
+    }
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await processAndAddImageFiles(files);
+    if (e.target) e.target.value = '';
+  };
+
+  // Drag & drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await processAndAddImageFiles(e.dataTransfer.files);
+    }
+  };
+
+  // Attach from Image URL / TradingView Link
+  const handleAddImageUrl = () => {
+    const trimmed = imageUrlInput.trim();
+    if (!trimmed || !isValidImageUrl(trimmed)) return;
+
+    const newScr: TradeScreenshot = {
+      id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      url: trimmed,
+      caption: `${symbol} Chart Link`,
+      category: 'Entry',
+      createdAt: new Date().toISOString(),
+    };
+    setScreenshots((prev) => [...prev, newScr]);
+    setImageUrlInput('');
+    setShowUrlInput(false);
+  };
+
+  // Global paste handler when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGlobalPaste = async (e: ClipboardEvent) => {
+      if (e.clipboardData) {
+        const imageFiles = extractImageFilesFromClipboard(e.clipboardData.items);
+        if (imageFiles.length > 0) {
+          e.preventDefault();
+          await processAndAddImageFiles(imageFiles);
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => {
+      window.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [isOpen, symbol]);
 
   const generateAutoChartImage = () => {
     const chartUrl = generateTradingChartSVG({
@@ -324,29 +433,34 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
     const plannedRRVal = calculatePlannedRR(entry, stopLoss, takeProfit);
     const realizedRRVal = calculateRealizedRR(entry, stopLoss, exitPrice, direction);
 
+    const finalNetPL = Number(netPLInput) || 0;
+    const finalComm = Number(commissionInput) || 0;
+    const finalFees = Number(feesInput) || 0;
+    const finalGrossPL = Number((finalNetPL + finalComm + finalFees).toFixed(2));
+
     const tradeData = {
       userId: 'user_default',
       accountId: accountId || accounts[0]?.id || '',
       date,
       time,
-      symbol: symbol.toUpperCase(),
+      symbol: symbol.toUpperCase().trim(),
       direction,
       session,
       strategyId,
       setup,
-      entry: Number(entry),
-      stopLoss: Number(stopLoss),
-      takeProfit: Number(takeProfit),
-      exitPrice: Number(exitPrice),
-      lotSize: Number(lotSize),
-      riskPercent: Number(riskPercent),
-      riskAmount: Number(riskAmount),
-      plannedRR: plannedRRVal,
-      realizedRR: realizedRRVal,
-      grossPL: Number((netPL + commission + fees).toFixed(2)),
-      commission: Number(commission),
-      fees: Number(fees),
-      netPL: Number(netPL),
+      entry: Number(entry) || 0,
+      stopLoss: Number(stopLoss) || 0,
+      takeProfit: Number(takeProfit) || 0,
+      exitPrice: Number(exitPrice) || 0,
+      lotSize: Number(lotSize) || 0,
+      riskPercent: Number(riskPercent) || 1.0,
+      riskAmount: Number(riskAmount) || 0,
+      plannedRR: Number(plannedRRVal) || 0,
+      realizedRR: Number(realizedRRVal) || 0,
+      grossPL: finalGrossPL,
+      commission: finalComm,
+      fees: finalFees,
+      netPL: finalNetPL,
       outcome,
       notes,
       screenshots,
@@ -764,6 +878,53 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     </div>
                   </div>
                 </div>
+
+                {/* Quick Screenshot Attachment Bar */}
+                <div className="bg-[#15181D] border border-[#292D33] rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-[#1B1F24] border border-[#292D33] text-emerald-400">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-[#F5F5F5] block">
+                        Chart Screenshot
+                        {screenshots.length > 0 && (
+                          <span className="ml-2 text-emerald-400 font-mono text-[11px] font-normal">
+                            ({screenshots.length} attached)
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-[#A0A6AE]">
+                        {screenshots.length > 0
+                          ? 'Chart is ready and will be saved with this trade.'
+                          : 'Paste chart (Ctrl+V) or click to upload screenshot.'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {screenshots.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('screenshots')}
+                        className="py-1.5 px-3 rounded-lg bg-[#292D33] hover:bg-[#323740] text-emerald-400 text-xs font-medium cursor-pointer"
+                      >
+                        Manage ({screenshots.length})
+                      </button>
+                    )}
+                    <label className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{screenshots.length > 0 ? '+ Add More' : 'Attach Chart'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -959,28 +1120,55 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
           {/* TAB 3: CHART SCREENSHOTS */}
           {activeTab === 'screenshots' && (
             <div className="space-y-4">
+              {/* Header Action Bar */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#1B1F24] p-4 rounded-xl border border-[#292D33]">
                 <div>
-                  <h3 className="text-xs font-bold text-[#F5F5F5]">Attach Chart Screenshots</h3>
-                  <p className="text-[11px] text-[#A0A6AE]">
-                    Upload PNG, JPG, WEBP chart images or generate an automated trading chart visualization.
+                  <h3 className="text-xs font-bold text-[#F5F5F5] flex items-center gap-2">
+                    Attach Chart Screenshots
+                    {screenshots.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">
+                        {screenshots.length} attached
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-[#A0A6AE] mt-0.5">
+                    Upload PNG/JPG/WEBP, paste from clipboard (Ctrl+V), or generate automatic SVG chart.
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={generateAutoChartImage}
                     className="py-2 px-3 rounded-lg bg-[#292D33] hover:bg-[#323740] text-[#F5F5F5] text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Generate realistic candle chart from trade numbers"
                   >
-                    <ImageIcon className="w-4 h-4 text-emerald-400" />
-                    <span>Auto Generate Chart</span>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Auto Chart</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(!showUrlInput)}
+                    className={`py-2 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                      showUrlInput
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[#292D33] hover:bg-[#323740] text-[#F5F5F5]'
+                    }`}
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                    <span>Attach URL</span>
                   </button>
 
                   <label className="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all">
-                    <Upload className="w-4 h-4" />
-                    <span>Upload Image</span>
+                    {isProcessingImage ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isProcessingImage ? 'Processing...' : 'Upload Image'}</span>
                     <input
+                      ref={fileInputRef}
                       type="file"
                       accept="image/*"
                       multiple
@@ -991,28 +1179,103 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                 </div>
               </div>
 
-              {/* Screenshots Preview Grid */}
-              {screenshots.length === 0 ? (
-                <div className="border-2 border-dashed border-[#292D33] rounded-xl p-8 text-center text-[#6F7680]">
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-[#6F7680]" />
-                  <p className="text-xs font-medium text-[#A0A6AE]">No chart screenshots attached yet</p>
-                  <p className="text-[11px] mt-1">
-                    Drag and drop chart images or click "Auto Generate Chart" above.
-                  </p>
+              {/* Paste or Success Notification */}
+              {pasteNotice && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{pasteNotice}</span>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {screenshots.map((scr, idx) => (
+              )}
+
+              {/* URL Input Bar */}
+              {showUrlInput && (
+                <div className="flex items-center gap-2 bg-[#1B1F24] p-3 rounded-xl border border-[#292D33]">
+                  <input
+                    type="url"
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddImageUrl())}
+                    placeholder="Paste image link or TradingView snapshot URL (https://...)"
+                    className="flex-1 bg-[#15181D] border border-[#292D33] text-[#F5F5F5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddImageUrl}
+                    disabled={!imageUrlInput.trim()}
+                    className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium cursor-pointer"
+                  >
+                    Attach Link
+                  </button>
+                </div>
+              )}
+
+              {/* Drag & Drop Zone */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-emerald-500 bg-emerald-500/10 scale-[1.01]'
+                    : 'border-[#292D33] hover:border-emerald-500/50 bg-[#1B1F24]/40 hover:bg-[#1B1F24]'
+                }`}
+              >
+                {isProcessingImage ? (
+                  <div className="flex flex-col items-center justify-center py-2">
+                    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-2" />
+                    <p className="text-xs font-medium text-emerald-400">Optimizing and preparing chart image...</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className={`w-7 h-7 mx-auto mb-2 ${isDragging ? 'text-emerald-400' : 'text-[#6F7680]'}`} />
+                    <p className="text-xs font-medium text-[#F5F5F5]">
+                      {isDragging ? 'Drop chart images here!' : 'Click to upload or drag and drop chart images'}
+                    </p>
+                    <p className="text-[11px] text-[#A0A6AE] mt-1">
+                      Supports JPG, PNG, WEBP, SVG • You can also press <kbd className="px-1.5 py-0.5 bg-[#292D33] rounded text-emerald-400 font-mono text-[10px]">Ctrl + V</kbd> to paste from clipboard
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* Screenshots Preview Grid */}
+              {screenshots.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  {screenshots.map((scr) => (
                     <div key={scr.id} className="bg-[#1B1F24] border border-[#292D33] rounded-xl overflow-hidden p-3 space-y-2">
-                      <div className="relative aspect-video bg-[#0D0F12] rounded-lg overflow-hidden border border-[#292D33]">
-                        <img src={scr.url} alt={scr.caption} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setScreenshots((prev) => prev.filter((s) => s.id !== scr.id))}
-                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 text-red-400 hover:bg-red-600 hover:text-white transition-all cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="relative aspect-video bg-[#0D0F12] rounded-lg overflow-hidden border border-[#292D33] group">
+                        <img
+                          src={scr.url}
+                          alt={scr.caption || 'Trade Screenshot'}
+                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => setZoomedImage(scr.url)}
+                          onError={(e) => {
+                            // Fallback if URL fails
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setZoomedImage(scr.url)}
+                            className="p-1.5 rounded-lg bg-black/80 text-[#A0A6AE] hover:text-white hover:bg-black transition-all cursor-pointer"
+                            title="Zoom Chart"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setScreenshots((prev) => prev.filter((s) => s.id !== scr.id))}
+                            className="p-1.5 rounded-lg bg-black/80 text-red-400 hover:bg-red-600 hover:text-white transition-all cursor-pointer"
+                            title="Remove Screenshot"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] font-semibold text-emerald-400">
+                          {scr.category}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
@@ -1334,6 +1597,29 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
           </div>
         </form>
       </div>
+
+      {/* Fullscreen Zoom Lightbox */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-[90vh] w-full flex flex-col items-center">
+            <button
+              onClick={() => setZoomedImage(null)}
+              className="absolute -top-10 right-0 p-2 rounded-lg bg-[#292D33] text-[#F5F5F5] hover:bg-red-600 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+            >
+              <X className="w-4 h-4" /> Close
+            </button>
+            <img
+              src={zoomedImage}
+              alt="Zoomed Chart Screenshot"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg border border-[#292D33] shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

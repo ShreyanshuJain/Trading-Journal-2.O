@@ -1,17 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useJournal } from '../context/JournalContext';
 import { HeaderBar } from './HeaderBar';
-import { LayoutGrid, List, Filter, Eye, Plus, Image as ImageIcon } from 'lucide-react';
+import { LayoutGrid, List, Eye, Plus, Image as ImageIcon, Sparkles, Upload, Loader2 } from 'lucide-react';
+import { generateTradingChartSVG } from '../utils/chartSvgGenerator';
+import { optimizeImageFile, uploadScreenshotImage } from '../utils/imageUtils';
+import { Trade, TradeScreenshot } from '../types';
 
 export const TradeGalleryView: React.FC = () => {
   const {
     filteredTrades,
     strategies,
+    settings,
     setSelectedTradeDetail,
     setIsAddTradeOpen,
+    updateTrade,
   } = useJournal();
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [processingTradeId, setProcessingTradeId] = useState<string | null>(null);
 
   // Filters
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
@@ -32,6 +38,84 @@ export const TradeGalleryView: React.FC = () => {
       return true;
     });
   }, [filteredTrades, strategyFilter, outcomeFilter, symbolFilter]);
+
+  const handleQuickAutoChart = async (e: React.MouseEvent, trade: Trade) => {
+    e.stopPropagation();
+    setProcessingTradeId(trade.id);
+    try {
+      const outcomeVal: 'WIN' | 'LOSS' | 'BREAKEVEN' | 'OPEN' =
+        trade.outcome === 'PARTIAL' ? 'WIN' : trade.outcome;
+      const chartUrl = generateTradingChartSVG({
+        symbol: trade.symbol,
+        direction: trade.direction,
+        outcome: outcomeVal,
+        entryPrice: trade.entry,
+        stopLossPrice: trade.stopLoss,
+        takeProfitPrice: trade.takeProfit,
+      });
+
+      const newScr: TradeScreenshot = {
+        id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        url: chartUrl,
+        caption: `${trade.symbol} Auto Generated Analysis Chart`,
+        category: 'Entry',
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = {
+        ...trade,
+        screenshots: [...(trade.screenshots || []), newScr],
+      };
+      await updateTrade(updated);
+    } catch (err) {
+      console.error('Failed to auto-generate chart:', err);
+    } finally {
+      setProcessingTradeId(null);
+    }
+  };
+
+  const handleQuickImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, trade: Trade) => {
+    e.stopPropagation();
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setProcessingTradeId(trade.id);
+    try {
+      const newScreenshots: TradeScreenshot[] = [...(trade.screenshots || [])];
+      const fileList = Array.from(files) as File[];
+      for (const file of fileList) {
+        if (!file.type.startsWith('image/')) continue;
+        const optimizedUrl = await optimizeImageFile(file);
+        let finalUrl = optimizedUrl;
+        try {
+          finalUrl = await uploadScreenshotImage(
+            optimizedUrl,
+            settings?.cloudinaryCloudName,
+            settings?.cloudinaryUploadPreset,
+            settings?.cloudinaryApiKey,
+            settings?.cloudinaryApiSecret
+          );
+        } catch (uErr) {
+          console.warn('Upload fallback to local base64:', uErr);
+        }
+        newScreenshots.push({
+          id: `scr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          url: finalUrl,
+          caption: `${trade.symbol} Chart Screenshot`,
+          category: 'Entry',
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      const updated = { ...trade, screenshots: newScreenshots };
+      await updateTrade(updated);
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+    } finally {
+      setProcessingTradeId(null);
+      if (e.target) e.target.value = '';
+    }
+  };
 
   return (
     <div className="pb-20 lg:pb-12">
@@ -139,16 +223,54 @@ export const TradeGalleryView: React.FC = () => {
                   className="bg-[#15181D] border border-[#292D33] hover:border-emerald-500/50 rounded-xl overflow-hidden shadow-lg transition-all cursor-pointer flex flex-col group"
                 >
                   {/* Chart Screenshot Thumbnail */}
-                  <div className="relative aspect-video bg-[#0D0F12] border-b border-[#292D33] overflow-hidden">
-                    {mainScreenshot ? (
-                      <img
-                        src={mainScreenshot}
-                        alt={trade.symbol}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                  <div className="relative aspect-video bg-[#0D0F12] border-b border-[#292D33] overflow-hidden flex items-center justify-center">
+                    {processingTradeId === trade.id ? (
+                      <div className="flex flex-col items-center justify-center p-4">
+                        <Loader2 className="w-6 h-6 text-emerald-400 animate-spin mb-1" />
+                        <span className="text-[10px] text-emerald-400 font-medium">Updating chart...</span>
+                      </div>
+                    ) : mainScreenshot ? (
+                      <>
+                        <img
+                          src={mainScreenshot}
+                          alt={trade.symbol}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        {trade.screenshots && trade.screenshots.length > 1 && (
+                          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-emerald-400">
+                            +{trade.screenshots.length - 1} more
+                          </span>
+                        )}
+                      </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[#6F7680] text-xs">
-                        No Screenshot Attached
+                      <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-[#15181D]/80">
+                        <ImageIcon className="w-6 h-6 mb-1 text-[#6F7680] group-hover:text-emerald-400 transition-colors" />
+                        <span className="text-[11px] font-medium text-[#A0A6AE] mb-2">No Screenshot Attached</span>
+                        <div className="flex items-center gap-1.5 z-10" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickAutoChart(e, trade)}
+                            className="px-2 py-1 rounded bg-[#1B1F24] hover:bg-[#292D33] border border-[#292D33] text-emerald-400 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                            title="Auto Generate Chart"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>Auto Chart</span>
+                          </button>
+                          <label className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-all">
+                            <Upload className="w-3 h-3" />
+                            <span>Upload</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => handleQuickImageUpload(e, trade)}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
                       </div>
                     )}
 
@@ -227,7 +349,14 @@ export const TradeGalleryView: React.FC = () => {
                 >
                   <div className="w-full sm:w-40 aspect-video rounded-lg bg-[#0D0F12] overflow-hidden border border-[#292D33] shrink-0">
                     {mainScreenshot ? (
-                      <img src={mainScreenshot} alt={trade.symbol} className="w-full h-full object-cover" />
+                      <img
+                        src={mainScreenshot}
+                        alt={trade.symbol}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[10px] text-[#6F7680]">
                         No Image

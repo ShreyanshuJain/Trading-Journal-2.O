@@ -5,22 +5,45 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { MongoClient, Db } from 'mongodb';
 import dotenv from 'dotenv';
+import { v2 as cloudinary } from 'cloudinary';
 
 dotenv.config();
 
-const app = express();
-const PORT = parseInt(process.env.PORT || '5000', 10);
+// Configure Cloudinary
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || 'bgowyyl2';
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '124251242856859';
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || '';
 
-app.use(express.json({ limit: '10mb' }));
+cloudinary.config({
+  cloud_name: CLOUDINARY_CLOUD_NAME,
+  api_key: CLOUDINARY_API_KEY,
+  api_secret: CLOUDINARY_API_SECRET,
+  secure: true,
+});
+
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
+
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve uploaded trade pictures statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URL || '';
+const rawMongoUri = process.env.MONGODB_URI || process.env.MONGO_URL || '';
+const MONGODB_URI = rawMongoUri.trim();
 let dbClient: MongoClient | null = null;
 let db: Db | null = null;
 
 async function initMongoDB() {
-  if (!MONGODB_URI) {
-    console.log('No MONGODB_URI configured. Running with file-backed local persistence.');
+  if (!MONGODB_URI || (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://'))) {
+    console.log('No valid MongoDB URI configured. Running with file-backed local persistence (data_store.json).');
     return;
   }
   try {
@@ -28,8 +51,8 @@ async function initMongoDB() {
     await dbClient.connect();
     db = dbClient.db('trading_journal');
     console.log('Successfully connected to MongoDB!');
-  } catch (err) {
-    console.error('Failed to connect to MongoDB, falling back to local file persistence:', err);
+  } catch (err: any) {
+    console.warn('Could not connect to MongoDB, falling back to local file persistence:', err.message || err);
   }
 }
 
@@ -63,8 +86,173 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     database: db ? 'MongoDB' : 'Local File Persistence',
+    cloudinary: {
+      cloudName: CLOUDINARY_CLOUD_NAME,
+      configured: Boolean(CLOUDINARY_API_SECRET),
+    },
     timestamp: new Date().toISOString(),
   });
+});
+
+// Helper to save base64/buffer image to local uploads folder
+function saveImageLocally(imageData: string, customPrefix = 'trade_pic'): { url: string; filename: string } {
+  const matches = imageData.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+  let ext = 'png';
+  let buffer: Buffer;
+
+  if (matches && matches.length === 3) {
+    ext = matches[1] === 'svg+xml' ? 'svg' : matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    buffer = Buffer.from(matches[2], 'base64');
+  } else {
+    // If it's a raw base64 string without data prefix
+    try {
+      buffer = Buffer.from(imageData, 'base64');
+    } catch {
+      buffer = Buffer.from(imageData, 'utf-8');
+    }
+  }
+
+  const filename = `${customPrefix}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}.${ext}`;
+  const filePath = path.join(UPLOADS_DIR, filename);
+  fs.writeFileSync(filePath, buffer);
+  return { url: `/uploads/${filename}`, filename };
+}
+
+// Universal Image Upload Endpoint
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { image, cloudName, apiKey, apiSecret, folder } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    const cName = cloudName || CLOUDINARY_CLOUD_NAME;
+    const k = apiKey || CLOUDINARY_API_KEY;
+    const s = apiSecret || CLOUDINARY_API_SECRET;
+
+    // 1. If Cloudinary credentials are provided, attempt Cloudinary upload
+    if (cName && s) {
+      try {
+        const activeConfig = {
+          cloud_name: cName,
+          api_key: k,
+          api_secret: s,
+          secure: true,
+        };
+
+        const result = await cloudinary.uploader.upload(image, {
+          ...activeConfig,
+          folder: folder || 'trading_journal',
+          resource_type: 'auto',
+        });
+
+        const optimizedUrl = cloudinary.url(result.public_id, {
+          ...activeConfig,
+          fetch_format: 'auto',
+          quality: 'auto',
+        });
+
+        return res.json({
+          success: true,
+          provider: 'cloudinary',
+          url: result.secure_url || result.url,
+          optimizedUrl: optimizedUrl || result.secure_url,
+          publicId: result.public_id,
+        });
+      } catch (cloudErr: any) {
+        console.warn('Cloudinary upload warning, using local file storage fallback:', cloudErr.message || cloudErr);
+      }
+    }
+
+    // 2. Local File Storage Fallback (Always works instantly without credentials)
+    const { url, filename } = saveImageLocally(image, 'chart');
+    return res.json({
+      success: true,
+      provider: 'local',
+      url,
+      optimizedUrl: url,
+      filename,
+    });
+  } catch (err: any) {
+    console.error('Universal upload error:', err);
+    res.status(500).json({ error: err.message || 'Failed to upload image' });
+  }
+});
+
+// Cloudinary Image Upload Endpoint (with Local Fallback)
+app.post('/api/upload/cloudinary', async (req, res) => {
+  try {
+    const { image, cloudName, apiKey, apiSecret, publicId, folder } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    const cName = cloudName || CLOUDINARY_CLOUD_NAME;
+    const k = apiKey || CLOUDINARY_API_KEY;
+    const s = apiSecret || CLOUDINARY_API_SECRET;
+
+    if (cName && s) {
+      const activeConfig = {
+        cloud_name: cName,
+        api_key: k,
+        api_secret: s,
+        secure: true,
+      };
+
+      const result = await cloudinary.uploader.upload(image, {
+        ...activeConfig,
+        folder: folder || 'trading_journal',
+        public_id: publicId,
+        resource_type: 'auto',
+      });
+
+      const optimizedUrl = cloudinary.url(result.public_id, {
+        ...activeConfig,
+        fetch_format: 'auto',
+        quality: 'auto',
+      });
+
+      return res.json({
+        success: true,
+        provider: 'cloudinary',
+        url: result.secure_url || result.url,
+        optimizedUrl: optimizedUrl || result.secure_url,
+        publicId: result.public_id,
+        format: result.format,
+        width: result.width,
+        height: result.height,
+      });
+    }
+
+    // Fallback to local server image storage
+    const { url, filename } = saveImageLocally(image, 'chart');
+    return res.json({
+      success: true,
+      provider: 'local',
+      url,
+      optimizedUrl: url,
+      filename,
+    });
+  } catch (err: any) {
+    console.warn('Cloudinary server upload error, saving locally:', err.message || err);
+    try {
+      const { url, filename } = saveImageLocally(req.body.image, 'chart');
+      return res.json({
+        success: true,
+        provider: 'local_fallback',
+        url,
+        optimizedUrl: url,
+        filename,
+      });
+    } catch (saveErr: any) {
+      return res.status(500).json({
+        error: err.message || 'Failed to upload image to Cloudinary',
+        details: err,
+      });
+    }
+  }
 });
 
 // GET all journal data (trades, accounts, strategies, tags, settings)
@@ -178,7 +366,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

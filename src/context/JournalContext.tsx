@@ -46,6 +46,11 @@ import {
   calculateDayOfWeekStats,
   calculateNewsStats,
 } from '../utils/calculations';
+import {
+  uploadToCloudinary,
+  isCloudinaryConfigured,
+  uploadScreenshotImage,
+} from '../utils/imageUtils';
 
 export type NavigationPage =
   | 'dashboard'
@@ -93,7 +98,7 @@ interface JournalContextType {
   trades: Trade[];
   filteredTrades: Trade[];
   addTrade: (trade: Omit<Trade, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
-  updateTrade: (id: string, trade: Partial<Trade>) => Promise<void>;
+  updateTrade: (idOrTrade: string | Trade, tradeFields?: Partial<Trade>) => Promise<void>;
   duplicateTrade: (tradeId: string) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
   resetDemoData: () => Promise<void>;
@@ -140,14 +145,34 @@ const JournalContext = createContext<JournalContextType | undefined>(undefined);
 
 // ── Realtime Database helpers ─────────────────────────────────────────────────
 
-/** Upload a base64 screenshot to Firebase Storage; returns updated screenshot with permanent URL */
-async function uploadScreenshot(userId: string, tradeId: string, screenshot: TradeScreenshot): Promise<TradeScreenshot> {
-  if (!screenshot.url.startsWith('data:')) return screenshot; // already a permanent URL
-  const path = `users/${userId}/trades/${tradeId}/${screenshot.id}`;
-  const sRef = storageRef(storage, path);
-  await uploadString(sRef, screenshot.url, 'data_url');
-  const downloadURL = await getDownloadURL(sRef);
-  return { ...screenshot, url: downloadURL, storagePath: path };
+/** Upload a screenshot using universal upload endpoint (Cloudinary / server storage fallback) */
+async function uploadScreenshot(
+  userId: string,
+  tradeId: string,
+  screenshot: TradeScreenshot,
+  settings?: UserSettings
+): Promise<TradeScreenshot> {
+  if (!screenshot.url) return screenshot;
+  
+  // If already a permanent URL (like /uploads/... or https://res.cloudinary.com/...)
+  if (!screenshot.url.startsWith('data:')) {
+    return screenshot;
+  }
+
+  // Upload to universal upload endpoint
+  try {
+    const permanentUrl = await uploadScreenshotImage(
+      screenshot.url,
+      settings?.cloudinaryCloudName,
+      settings?.cloudinaryUploadPreset,
+      settings?.cloudinaryApiKey,
+      settings?.cloudinaryApiSecret
+    );
+    return { ...screenshot, url: permanentUrl, storagePath: undefined };
+  } catch (err) {
+    console.warn('Screenshot upload error, keeping local base64:', err);
+    return screenshot;
+  }
 }
 
 /** Delete a screenshot from Firebase Storage (best-effort) */
@@ -216,12 +241,19 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     const loaded = { accounts: false, trades: false, strategies: false, tags: false, settings: false };
     const checkDone = () => { if (Object.values(loaded).every(Boolean)) setDataLoading(false); };
 
+    // Safety timeout: ensure loader clears within 2.5s regardless of network conditions
+    const safetyTimeout = setTimeout(() => {
+      setDataLoading(false);
+    }, 2500);
+
     const unsubscribers: (() => void)[] = [];
 
     // Accounts
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'accounts'), (snap) => {
         setRawAccounts(snap.docs.map((d) => d.data() as Omit<Account, 'currentBalance'>));
+        if (!loaded.accounts) { loaded.accounts = true; checkDone(); }
+      }, () => {
         if (!loaded.accounts) { loaded.accounts = true; checkDone(); }
       })
     );
@@ -231,6 +263,8 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       onSnapshot(collection(db, 'users', userId, 'trades'), (snap) => {
         setTrades(snap.docs.map((d) => d.data() as unknown as Trade));
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
+      }, () => {
+        if (!loaded.trades) { loaded.trades = true; checkDone(); }
       })
     );
 
@@ -239,6 +273,8 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       onSnapshot(collection(db, 'users', userId, 'strategies'), (snap) => {
         setStrategies(snap.docs.map((d) => d.data() as unknown as Strategy));
         if (!loaded.strategies) { loaded.strategies = true; checkDone(); }
+      }, () => {
+        if (!loaded.strategies) { loaded.strategies = true; checkDone(); }
       })
     );
 
@@ -246,6 +282,8 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'tags'), (snap) => {
         setTags(snap.docs.map((d) => d.data() as unknown as Tag));
+        if (!loaded.tags) { loaded.tags = true; checkDone(); }
+      }, () => {
         if (!loaded.tags) { loaded.tags = true; checkDone(); }
       })
     );
@@ -257,10 +295,13 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
           setSettings(snap.data() as unknown as UserSettings);
         }
         if (!loaded.settings) { loaded.settings = true; checkDone(); }
+      }, () => {
+        if (!loaded.settings) { loaded.settings = true; checkDone(); }
       })
     );
 
     return () => {
+      clearTimeout(safetyTimeout);
       unsubscribers.forEach((u) => u());
       setDataLoading(true);
     };
@@ -310,7 +351,10 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   const accounts: Account[] = useMemo(() => {
     return rawAccounts.map((acc) => {
       const accTrades = trades.filter((t) => t.accountId === acc.id);
-      const totalNetPL = accTrades.reduce((sum, t) => sum + (t.netPL || 0), 0);
+      const totalNetPL = accTrades.reduce((sum, t) => {
+        const pl = typeof t.netPL === 'number' ? t.netPL : parseFloat(t.netPL as any) || 0;
+        return sum + pl;
+      }, 0);
       return {
         ...acc,
         currentBalance: Number(((acc.startingBalance || 0) + totalNetPL).toFixed(2)),
@@ -382,13 +426,31 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     showToast('Saving…');
 
     try {
-      // Upload any base64 screenshots to Firebase Storage first
+      // 1. Upload any base64 screenshots to server storage / Cloudinary
       const processedScreenshots = await Promise.all(
-        (tradeData.screenshots || []).map((s) => uploadScreenshot(userId, tradeId, s))
+        (tradeData.screenshots || []).map((s) => uploadScreenshot(userId, tradeId, s, settings))
       );
+
+      const netPL = typeof tradeData.netPL === 'number' ? tradeData.netPL : parseFloat(tradeData.netPL as any) || 0;
+      const commission = typeof tradeData.commission === 'number' ? tradeData.commission : parseFloat(tradeData.commission as any) || 0;
+      const fees = typeof tradeData.fees === 'number' ? tradeData.fees : parseFloat(tradeData.fees as any) || 0;
+      const grossPL = tradeData.grossPL !== undefined ? Number(tradeData.grossPL) : Number((netPL + commission + fees).toFixed(2));
 
       const newTrade: Trade = cleanForRealtimeDatabase({
         ...tradeData,
+        netPL,
+        grossPL,
+        commission,
+        fees,
+        entry: Number(tradeData.entry) || 0,
+        stopLoss: Number(tradeData.stopLoss) || 0,
+        takeProfit: Number(tradeData.takeProfit) || 0,
+        exitPrice: Number(tradeData.exitPrice) || 0,
+        lotSize: Number(tradeData.lotSize) || 0,
+        riskPercent: Number(tradeData.riskPercent) || 1.0,
+        riskAmount: Number(tradeData.riskAmount) || 0,
+        plannedRR: Number(tradeData.plannedRR) || 0,
+        realizedRR: Number(tradeData.realizedRR) || 0,
         screenshots: processedScreenshots,
         id: tradeId,
         userId,
@@ -396,7 +458,19 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
         updatedAt: nowISO,
       });
 
+      // Optimistically update in-memory state instantly so P&L and balance reflect immediately
+      setTrades((prev) => [newTrade, ...prev.filter((t) => t.id !== tradeId)]);
+
+      // Save to database
       await setDoc(doc(db, 'users', userId, 'trades', tradeId), newTrade);
+
+      // Also sync to server backup endpoint
+      fetch('/api/trades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTrade),
+      }).catch((e) => console.warn('Server trade sync notice:', e));
+
       showToast('✓ Trade saved');
     } catch (err) {
       console.error('Failed to save trade:', err);
@@ -406,7 +480,13 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     }
   };
 
-  const updateTrade = async (id: string, updatedFields: Partial<Trade>) => {
+  const updateTrade = async (idOrTrade: string | Trade, updatedFields?: Partial<Trade>) => {
+    const id = typeof idOrTrade === 'string' ? idOrTrade : idOrTrade?.id;
+    if (!id) {
+      console.error('Cannot update trade without valid ID');
+      return;
+    }
+    const fields = typeof idOrTrade === 'string' ? (updatedFields || {}) : idOrTrade;
     const nowISO = new Date().toISOString();
     const existing = trades.find((t) => t.id === id);
     setIsSaving(true);
@@ -414,21 +494,36 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
 
     try {
       // Upload any new base64 screenshots
-      let screenshots = updatedFields.screenshots ?? existing?.screenshots ?? [];
+      let screenshots = fields?.screenshots ?? existing?.screenshots ?? [];
       screenshots = await Promise.all(
-        screenshots.map((s) => uploadScreenshot(userId, id, s))
+        screenshots.map((s) => uploadScreenshot(userId, id, s, settings))
       );
+
+      const netPL = fields?.netPL !== undefined
+        ? (typeof fields.netPL === 'number' ? fields.netPL : parseFloat(fields.netPL as any) || 0)
+        : (existing?.netPL || 0);
 
       const updated = cleanForRealtimeDatabase({
         ...(existing || {}),
-        ...updatedFields,
+        ...fields,
+        netPL,
         screenshots,
         id,
         userId,
         updatedAt: nowISO,
       });
 
+      // Optimistically update state
+      setTrades((prev) => prev.map((t) => (t.id === id ? updated : t)));
+
       await setDoc(doc(db, 'users', userId, 'trades', id), updated, { merge: true });
+
+      fetch(`/api/trades/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      }).catch((e) => console.warn('Server trade update sync notice:', e));
+
       showToast('✓ Changes saved');
     } catch (err) {
       console.error('Failed to update trade:', err);
@@ -444,17 +539,18 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     const nowISO = new Date().toISOString();
     const newId = `trd_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
-    // Duplicate without Storage screenshots (avoid re-uploading)
     const newTrade: Trade = cleanForRealtimeDatabase({
       ...original,
       id: newId,
       userId,
       date: nowISO.split('T')[0],
-      notes: `[Duplicate] ${original.notes}`,
-      screenshots: [], // Don't copy screenshots to avoid Storage duplication
+      notes: `[Duplicate] ${original.notes || ''}`,
+      screenshots: original.screenshots || [],
       createdAt: nowISO,
       updatedAt: nowISO,
     });
+
+    setTrades((prev) => [newTrade, ...prev.filter((t) => t.id !== newId)]);
 
     try {
       await setDoc(doc(db, 'users', userId, 'trades', newId), newTrade);
@@ -469,13 +565,16 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     const trade = trades.find((t) => t.id === id);
     if (selectedTradeDetail?.id === id) setSelectedTradeDetail(null);
 
+    // Optimistically remove from state
+    setTrades((prev) => prev.filter((t) => t.id !== id));
+
     showToast('Deleting…');
 
     try {
-      // Delete Realtime Database record
       await deleteDoc(doc(db, 'users', userId, 'trades', id));
 
-      // Delete associated screenshots from Storage
+      fetch(`/api/trades/${id}`, { method: 'DELETE' }).catch(() => {});
+
       if (trade?.screenshots) {
         await Promise.all(
           trade.screenshots
@@ -483,8 +582,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
             .map((s) => deleteStorageFile(s.storagePath!))
         );
       }
-
-      showToast('Trade deleted');
+      showToast('✓ Trade deleted');
     } catch (err) {
       console.error('Failed to delete trade:', err);
       showToast('Unable to delete trade. Please try again.');

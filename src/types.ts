@@ -128,6 +128,10 @@ export interface UserSettings {
   defaultCommission: number;
   enableNotifications: boolean;
   theme: 'dark' | 'light';
+  cloudinaryCloudName?: string;
+  cloudinaryApiKey?: string;
+  cloudinaryApiSecret?: string;
+  cloudinaryUploadPreset?: string;
 }
 
 export type DateRangeFilter =

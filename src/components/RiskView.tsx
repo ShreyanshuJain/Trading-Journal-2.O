@@ -4,7 +4,7 @@ import { HeaderBar } from './HeaderBar';
 import { ShieldAlert, DollarSign, Percent, AlertCircle, CheckCircle, Calculator, Info } from 'lucide-react';
 
 export const RiskView: React.FC = () => {
-  const { dashboardStats, activeAccount, settings, updateSettings } = useJournal();
+  const { dashboardStats, activeAccount, settings, updateSettings, showToast } = useJournal();
 
   // Position Sizing Calculator State
   const [accountBalanceInput, setAccountBalanceInput] = useState<number>(activeAccount ? activeAccount.currentBalance : 50000);
@@ -17,19 +17,16 @@ export const RiskView: React.FC = () => {
   const stopDistance = Math.abs(entryPrice - stopLossPrice);
   const calculatedUnits = stopDistance > 0 ? (riskAmount / stopDistance).toFixed(2) : '0';
 
-  const [maxRiskPerTrade, setMaxRiskPerTrade] = useState(settings.riskManagement?.maxRiskPerTradePercent || 2);
-  const [dailyLossLimit, setDailyLossLimit] = useState(settings.riskManagement?.dailyLossLimitDollar || 1000);
+  const [maxRiskPerTrade, setMaxRiskPerTrade] = useState(settings.maxPositionRiskPercent || 2);
+  const [maxDailyLossPercent, setMaxDailyLossPercent] = useState(settings.maxDailyLossPercent || 5);
 
   const handleSaveRiskRules = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings({
-      riskManagement: {
-        maxRiskPerTradePercent: maxRiskPerTrade,
-        dailyLossLimitDollar: dailyLossLimit,
-        maxOpenPositions: 3,
-        requireStopLoss: true,
-      },
+      maxPositionRiskPercent: maxRiskPerTrade,
+      maxDailyLossPercent: maxDailyLossPercent,
     });
+    showToast('✓ Risk rules saved');
   };
 
   return (
@@ -59,8 +56,10 @@ export const RiskView: React.FC = () => {
                 <span className="text-xs">Max Daily Drawdown</span>
                 <ShieldAlert className="w-4 h-4 text-amber-400" />
               </div>
-              <p className="text-xl font-bold text-[#F5F5F5]">${dailyLossLimit.toLocaleString()}</p>
-              <span className="text-[10px] text-[#A0A6AE] mt-1 block">hard circuit breaker</span>
+              <p className="text-xl font-bold text-[#F5F5F5]">{maxDailyLossPercent}%</p>
+              <span className="text-[10px] text-[#A0A6AE] mt-1 block">
+                Max ${((accountBalanceInput * maxDailyLossPercent) / 100).toLocaleString()} / day
+              </span>
             </div>
 
             <div className="bg-[#15181D] border border-[#292D33] rounded-xl p-4">
@@ -93,11 +92,12 @@ export const RiskView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs text-[#A0A6AE] block mb-1">Daily Loss Limit ($)</label>
+                <label className="text-xs text-[#A0A6AE] block mb-1">Max Daily Loss Limit (%)</label>
                 <input
                   type="number"
-                  value={dailyLossLimit}
-                  onChange={(e) => setDailyLossLimit(Number(e.target.value))}
+                  step="0.1"
+                  value={maxDailyLossPercent}
+                  onChange={(e) => setMaxDailyLossPercent(Number(e.target.value))}
                   className="w-full bg-[#1B1F24] border border-[#292D33] text-xs text-[#F5F5F5] rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
                 />
               </div>

@@ -159,33 +159,36 @@ export function calculateDashboardStats(trades: Trade[], account?: Account | nul
   let worstTrade: Trade | null = null;
 
   trades.forEach((trade) => {
-    totalPL += trade.netPL;
-    totalRR += trade.realizedRR || 0;
+    const pl = typeof trade.netPL === 'number' ? trade.netPL : parseFloat(trade.netPL as any) || 0;
+    const rMultiple = typeof trade.realizedRR === 'number' ? trade.realizedRR : parseFloat(trade.realizedRR as any) || 0;
+
+    totalPL += pl;
+    totalRR += rMultiple;
 
     if (trade.outcome === 'WIN') {
       winningTrades++;
-      grossProfit += trade.netPL;
+      grossProfit += pl;
     } else if (trade.outcome === 'LOSS') {
       losingTrades++;
-      grossLoss += Math.abs(trade.netPL);
+      grossLoss += Math.abs(pl);
     } else if (trade.outcome === 'BREAKEVEN') {
       breakevenTrades++;
     } else if (trade.outcome === 'OPEN') {
       openTrades++;
     } else if (trade.outcome === 'PARTIAL') {
-      if (trade.netPL > 0) {
+      if (pl > 0) {
         winningTrades++;
-        grossProfit += trade.netPL;
+        grossProfit += pl;
       } else {
         losingTrades++;
-        grossLoss += Math.abs(trade.netPL);
+        grossLoss += Math.abs(pl);
       }
     }
 
-    if (!bestTrade || trade.netPL > bestTrade.netPL) {
+    if (!bestTrade || pl > (Number(bestTrade.netPL) || 0)) {
       bestTrade = trade;
     }
-    if (!worstTrade || trade.netPL < worstTrade.netPL) {
+    if (!worstTrade || pl < (Number(worstTrade.netPL) || 0)) {
       worstTrade = trade;
     }
   });
@@ -317,9 +320,12 @@ export function calculateEquityCurve(trades: Trade[], startingBalance: number): 
   let cumulativeR = 0;
 
   sorted.forEach((trade) => {
-    cumulativePL += trade.netPL;
-    cumulativeR += trade.realizedRR || 0;
-    runningEquity += trade.netPL;
+    const pl = typeof trade.netPL === 'number' ? trade.netPL : parseFloat(trade.netPL as any) || 0;
+    const rMultiple = typeof trade.realizedRR === 'number' ? trade.realizedRR : parseFloat(trade.realizedRR as any) || 0;
+
+    cumulativePL += pl;
+    cumulativeR += rMultiple;
+    runningEquity += pl;
 
     if (runningEquity > peakEquity) {
       peakEquity = runningEquity;
@@ -330,7 +336,7 @@ export function calculateEquityCurve(trades: Trade[], startingBalance: number): 
       date: `${trade.date} ${trade.time || ''}`.trim(),
       tradeId: trade.id,
       symbol: trade.symbol,
-      dailyPL: trade.netPL,
+      dailyPL: pl,
       cumulativePL: Number(cumulativePL.toFixed(2)),
       equity: Number(runningEquity.toFixed(2)),
       rMultiple: Number(cumulativeR.toFixed(2)),
@@ -372,6 +378,9 @@ export function calculateStrategyStats(trades: Trade[], strategies: Strategy[]):
 
   trades.forEach((trade) => {
     const sid = trade.strategyId;
+    const pl = typeof trade.netPL === 'number' ? trade.netPL : parseFloat(trade.netPL as any) || 0;
+    const rMultiple = typeof trade.realizedRR === 'number' ? trade.realizedRR : parseFloat(trade.realizedRR as any) || 0;
+
     if (!stratMap[sid]) {
       stratMap[sid] = {
         strategyId: sid,
@@ -394,15 +403,15 @@ export function calculateStrategyStats(trades: Trade[], strategies: Strategy[]):
     const sg = stratGross[sid];
 
     st.totalTrades++;
-    st.netPL += trade.netPL;
-    sg.totalRR += trade.realizedRR || 0;
+    st.netPL += pl;
+    sg.totalRR += rMultiple;
 
     if (trade.outcome === 'WIN') {
       st.wins++;
-      sg.profit += trade.netPL;
+      sg.profit += pl;
     } else if (trade.outcome === 'LOSS') {
       st.losses++;
-      sg.loss += Math.abs(trade.netPL);
+      sg.loss += Math.abs(pl);
     } else if (trade.outcome === 'BREAKEVEN') {
       st.breakevens++;
     }
@@ -427,13 +436,16 @@ export function calculatePairStats(trades: Trade[]): PairPerformance[] {
 
   trades.forEach((t) => {
     const sym = t.symbol.toUpperCase();
+    const pl = typeof t.netPL === 'number' ? t.netPL : parseFloat(t.netPL as any) || 0;
+    const rMultiple = typeof t.realizedRR === 'number' ? t.realizedRR : parseFloat(t.realizedRR as any) || 0;
+
     if (!pairMap[sym]) {
       pairMap[sym] = { trades: [], profit: 0, loss: 0, totalRR: 0 };
     }
     pairMap[sym].trades.push(t);
-    if (t.netPL > 0) pairMap[sym].profit += t.netPL;
-    else pairMap[sym].loss += Math.abs(t.netPL);
-    pairMap[sym].totalRR += t.realizedRR || 0;
+    if (pl > 0) pairMap[sym].profit += pl;
+    else pairMap[sym].loss += Math.abs(pl);
+    pairMap[sym].totalRR += rMultiple;
   });
 
   return Object.entries(pairMap).map(([symbol, data]) => {
@@ -442,7 +454,7 @@ export function calculatePairStats(trades: Trade[]): PairPerformance[] {
     const losses = data.trades.filter((t) => t.outcome === 'LOSS').length;
     const closed = wins + losses;
     const winRate = closed > 0 ? Number(((wins / closed) * 100).toFixed(1)) : 0;
-    const netPL = Number(data.trades.reduce((acc, t) => acc + t.netPL, 0).toFixed(2));
+    const netPL = Number(data.trades.reduce((acc, t) => acc + (Number(t.netPL) || 0), 0).toFixed(2));
     const avgRR = totalTrades > 0 ? Number((data.totalRR / totalTrades).toFixed(2)) : 0;
     const profitFactor = data.loss > 0 ? Number((data.profit / data.loss).toFixed(2)) : data.profit > 0 ? 99.9 : 0;
 
@@ -472,8 +484,8 @@ export function calculateSessionStats(trades: Trade[]): SessionPerformance[] {
     const losses = sessionTrades.filter((t) => t.outcome === 'LOSS').length;
     const closed = wins + losses;
     const winRate = closed > 0 ? Number(((wins / closed) * 100).toFixed(1)) : 0;
-    const netPL = Number(sessionTrades.reduce((acc, t) => acc + t.netPL, 0).toFixed(2));
-    const totalRR = sessionTrades.reduce((acc, t) => acc + (t.realizedRR || 0), 0);
+    const netPL = Number(sessionTrades.reduce((acc, t) => acc + (Number(t.netPL) || 0), 0).toFixed(2));
+    const totalRR = sessionTrades.reduce((acc, t) => acc + (Number(t.realizedRR) || 0), 0);
     const avgRR = totalTrades > 0 ? Number((totalRR / totalTrades).toFixed(2)) : 0;
 
     return {
@@ -508,7 +520,7 @@ export function calculateDayOfWeekStats(trades: Trade[]): DayOfWeekPerformance[]
     const losses = dayTrades.filter((t) => t.outcome === 'LOSS').length;
     const closed = wins + losses;
     const winRate = closed > 0 ? Number(((wins / closed) * 100).toFixed(1)) : 0;
-    const netPL = Number(dayTrades.reduce((acc, t) => acc + t.netPL, 0).toFixed(2));
+    const netPL = Number(dayTrades.reduce((acc, t) => acc + (Number(t.netPL) || 0), 0).toFixed(2));
 
     return {
       day: dayName,
@@ -541,7 +553,7 @@ export function calculateNewsStats(trades: Trade[]): NewsPerformance[] {
     const losses = eventTrades.filter((t) => t.outcome === 'LOSS').length;
     const closed = wins + losses;
     const winRate = closed > 0 ? Number(((wins / closed) * 100).toFixed(1)) : 0;
-    const netPL = Number(eventTrades.reduce((acc, t) => acc + t.netPL, 0).toFixed(2));
+    const netPL = Number(eventTrades.reduce((acc, t) => acc + (Number(t.netPL) || 0), 0).toFixed(2));
 
     return {
       newsEvent,

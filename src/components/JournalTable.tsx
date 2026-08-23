@@ -448,13 +448,20 @@ export const JournalTable: React.FC = () => {
                           {trade.screenshots && trade.screenshots.length > 0 ? (
                             <button
                               onClick={() => setSelectedTradeDetail(trade)}
-                              className="p-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all cursor-pointer inline-flex items-center gap-1 text-[10px]"
+                              className="p-1 px-1.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all cursor-pointer inline-flex items-center gap-1 text-[10px]"
+                              title="View Attached Charts"
                             >
                               <ImageIcon className="w-3 h-3" />
                               <span>{trade.screenshots.length}</span>
                             </button>
                           ) : (
-                            <span className="text-[#6F7680] text-[10px]">-</span>
+                            <button
+                              onClick={() => setSelectedTradeDetail(trade)}
+                              className="p-1 px-1.5 rounded bg-[#1B1F24] hover:bg-[#22272E] text-[#6F7680] hover:text-emerald-400 border border-[#292D33] transition-all cursor-pointer inline-flex items-center gap-1 text-[10px]"
+                              title="Add Chart Screenshot"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
                           )}
                         </td>
 
