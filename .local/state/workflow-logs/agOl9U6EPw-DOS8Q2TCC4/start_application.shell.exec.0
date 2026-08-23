@@ -1,0 +1,7 @@
+[1G[0K⠙[1G[0K
+> react-example@0.0.0 dev
+> tsx server.ts
+
+[1G[0K⠙[1G[0K◇ injected env (0) from .env [2m// tip: ⌘ override existing { override: true }[0m
+No MONGODB_URI configured. Running with file-backed local persistence.
+Trading Journal Express + Vite Server running on http://0.0.0.0:5000
