@@ -1,14 +1,21 @@
 import {
-  DataSnapshot,
-  get as rtdbGet,
-  onValue as rtdbOnValue,
-  ref as rtdbRef,
-  remove as rtdbRemove,
-  set as rtdbSet,
-} from 'firebase/database';
+  collection as fsCollection,
+  doc as fsDoc,
+  onSnapshot as fsOnSnapshot,
+  setDoc as fsSetDoc,
+  deleteDoc as fsDeleteDoc,
+  getDocs as fsGetDocs,
+  DocumentData,
+  CollectionReference,
+  DocumentReference,
+} from 'firebase/firestore';
 import { db } from './config';
 
-type PathRef<K extends 'collection' | 'doc'> = { path: string; kind: K };
+type PathRef<K extends 'collection' | 'doc'> = {
+  path: string;
+  kind: K;
+  fsRef: K extends 'collection' ? CollectionReference<DocumentData> : DocumentReference<DocumentData>;
+};
 
 type DocumentSnapshot = {
   id: string;
@@ -31,11 +38,21 @@ function joinPath(parts: string[]) {
 }
 
 export function collection(_database: typeof db, ...parts: string[]): PathRef<'collection'> {
-  return { path: joinPath(parts), kind: 'collection' };
+  const path = joinPath(parts);
+  return {
+    path,
+    kind: 'collection',
+    fsRef: fsCollection(db, path),
+  };
 }
 
 export function doc(_database: typeof db, ...parts: string[]): PathRef<'doc'> {
-  return { path: joinPath(parts), kind: 'doc' };
+  const path = joinPath(parts);
+  return {
+    path,
+    kind: 'doc',
+    fsRef: fsDoc(db, path),
+  };
 }
 
 function getLocalKey(path: string) {
@@ -71,7 +88,7 @@ function toCollectionSnapshot(value: Record<string, Record<string, unknown>> | n
   const docs = value
     ? Object.entries(value).map(([id, data]) => ({
         id,
-        ref: { path: `${path}/${id}`, kind: 'doc' as const },
+        ref: { path: `${path}/${id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${path}/${id}`) },
         data: () => data || {},
       }))
     : [];
@@ -82,13 +99,11 @@ function toCollectionSnapshot(value: Record<string, Record<string, unknown>> | n
 const listeners = new Map<string, Set<() => void>>();
 
 function notifyListeners(path: string) {
-  // Notify exact doc path listeners
   const docSet = listeners.get(path);
   if (docSet) {
     docSet.forEach((cb) => cb());
   }
 
-  // Notify parent collection path listeners
   const pathParts = path.split('/');
   if (pathParts.length > 1) {
     const parentPath = pathParts.slice(0, -1).join('/');
@@ -129,47 +144,83 @@ export function onSnapshot(
     }
   };
 
-  // Register in local in-memory listeners
   if (!listeners.has(target.path)) {
     listeners.set(target.path, new Set());
   }
   const listenerCb = () => emitLocal();
   listeners.get(target.path)!.add(listenerCb);
 
-  // Emit initial local state immediately so UI is populated with zero delay
+  // Emit immediate cache so UI renders with zero lag
   emitLocal();
 
   try {
-    const unsub = rtdbOnValue(
-      rtdbRef(db, target.path),
-      (snapshot) => {
-        if (isUnsubscribed) return;
-        if (target.kind === 'doc') {
-          const val = snapshot.val();
-          if (val) setLocalValue(target.path, val);
-          callback({
-            exists: () => snapshot.exists(),
-            data: () => (snapshot.val() || getLocalValue(target.path) || {}) as Record<string, unknown>,
-          });
-        } else {
-          const val = snapshot.val();
-          if (val) setLocalValue(target.path, val);
-          callback(toCollectionSnapshot(val || getLocalValue(target.path), target.path));
-        }
-      },
-      (error) => {
-        if (isUnsubscribed) return;
-        console.warn(`[RTDB listener notice for ${target.path}]:`, error.message);
-        emitLocal();
-        if (onError) onError(error);
-      },
-    );
+    if (target.kind === 'doc') {
+      const unsub = fsOnSnapshot(
+        target.fsRef as DocumentReference<DocumentData>,
+        (snapshot) => {
+          if (isUnsubscribed) return;
+          if (snapshot.exists()) {
+            const val = snapshot.data();
+            setLocalValue(target.path, val);
+            callback({
+              exists: () => true,
+              data: () => val as Record<string, unknown>,
+            });
+          } else {
+            callback({
+              exists: () => false,
+              data: () => (getLocalValue(target.path) || {}) as Record<string, unknown>,
+            });
+          }
+        },
+        (error) => {
+          if (isUnsubscribed) return;
+          console.warn(`[Firestore listener notice for ${target.path}]:`, error.message);
+          emitLocal();
+          if (onError) onError(error);
+        },
+      );
 
-    return () => {
-      isUnsubscribed = true;
-      unsub();
-      listeners.get(target.path)?.delete(listenerCb);
-    };
+      return () => {
+        isUnsubscribed = true;
+        unsub();
+        listeners.get(target.path)?.delete(listenerCb);
+      };
+    } else {
+      const unsub = fsOnSnapshot(
+        target.fsRef as CollectionReference<DocumentData>,
+        (snapshot) => {
+          if (isUnsubscribed) return;
+          const colData: Record<string, Record<string, unknown>> = {};
+          const docs: DocumentSnapshot[] = snapshot.docs.map((docSnap) => {
+            const d = docSnap.data();
+            colData[docSnap.id] = d;
+            setLocalValue(`${target.path}/${docSnap.id}`, d);
+            return {
+              id: docSnap.id,
+              ref: { path: `${target.path}/${docSnap.id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${target.path}/${docSnap.id}`) },
+              data: () => d,
+            };
+          });
+          if (snapshot.docs.length > 0) {
+            setLocalValue(target.path, colData);
+          }
+          callback({ docs, empty: snapshot.empty });
+        },
+        (error) => {
+          if (isUnsubscribed) return;
+          console.warn(`[Firestore listener notice for ${target.path}]:`, error.message);
+          emitLocal();
+          if (onError) onError(error);
+        },
+      );
+
+      return () => {
+        isUnsubscribed = true;
+        unsub();
+        listeners.get(target.path)?.delete(listenerCb);
+      };
+    }
   } catch (err: any) {
     emitLocal();
     return () => {
@@ -186,21 +237,15 @@ export async function setDoc(target: PathRef<'doc'>, value: unknown, options?: {
   const collectionPath = pathParts.slice(0, -1).join('/');
 
   try {
-    if (options?.merge) {
-      const currentSnap = await rtdbGet(rtdbRef(db, target.path));
-      const current = currentSnap.val() || getLocalValue(target.path);
-      nextValue = { ...(current || {}), ...(value as Record<string, unknown>) };
-    }
-    await rtdbSet(rtdbRef(db, target.path), nextValue);
+    await fsSetDoc(target.fsRef as DocumentReference<DocumentData>, nextValue, { merge: options?.merge ?? false });
   } catch (err) {
-    console.warn('[RTDB setDoc using local fallback]:', err);
+    console.warn('[Firestore setDoc fallback to cache]:', err);
     if (options?.merge) {
       const current = getLocalValue(target.path);
       nextValue = { ...(current || {}), ...(value as Record<string, unknown>) };
     }
   }
 
-  // Update local cache & notify all active component listeners instantly
   setLocalValue(target.path, nextValue);
   if (collectionPath) {
     const colVal = getLocalValue(collectionPath) || {};
@@ -216,9 +261,9 @@ export async function deleteDoc(target: PathRef<'doc'>) {
   const collectionPath = pathParts.slice(0, -1).join('/');
 
   try {
-    await rtdbRemove(rtdbRef(db, target.path));
+    await fsDeleteDoc(target.fsRef as DocumentReference<DocumentData>);
   } catch (err) {
-    console.warn('[RTDB deleteDoc using local fallback]:', err);
+    console.warn('[Firestore deleteDoc fallback to cache]:', err);
   }
 
   removeLocalValue(target.path);
@@ -232,9 +277,13 @@ export async function deleteDoc(target: PathRef<'doc'>) {
 
 export async function getDocs(target: PathRef<'collection'>): Promise<CollectionSnapshot> {
   try {
-    const snapshot = await rtdbGet(rtdbRef(db, target.path));
-    const val = snapshot.val() || getLocalValue(target.path);
-    return toCollectionSnapshot(val, target.path);
+    const snapshot = await fsGetDocs(target.fsRef as CollectionReference<DocumentData>);
+    const docs = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ref: { path: `${target.path}/${docSnap.id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${target.path}/${docSnap.id}`) },
+      data: () => docSnap.data(),
+    }));
+    return { docs, empty: snapshot.empty };
   } catch {
     return toCollectionSnapshot(getLocalValue(target.path), target.path);
   }

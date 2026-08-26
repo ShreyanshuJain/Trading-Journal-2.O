@@ -48,14 +48,32 @@ export const Navigation: React.FC = () => {
     <>
       {/* ── Desktop Left Sidebar ── */}
       <aside className="hidden lg:flex flex-col w-64 bg-[#15181D] border-r border-[#292D33] min-h-screen fixed left-0 top-0 bottom-0 z-30">
-        {/* Logo */}
-        <div className="p-5 border-b border-[#292D33] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-emerald-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/10">
-            <TrendingUp className="w-5 h-5" />
+        {/* Logo in Circle */}
+        <div className="py-4 px-3 border-b border-[#292D33] flex flex-col items-center justify-center text-center">
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => setCurrentPage('dashboard')}
+            title="The Trading Journal Dashboard"
+          >
+            {/* Ambient glow */}
+            <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-emerald-500/30 via-amber-500/20 to-blue-500/30 blur-md opacity-60 group-hover:opacity-100 transition duration-300" />
+
+            {/* Circular Logo Frame */}
+            <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#292D33] group-hover:border-emerald-500/60 bg-[#0D0F12] shadow-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+              <img
+                src="/logo.png"
+                alt="The Trading Journal"
+                className="w-full h-full object-cover object-[50%_25%] scale-[1.35] block"
+              />
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-base tracking-tight text-[#F5F5F5]">Trading Journal</h1>
-            <p className="text-xs text-[#6F7680]">Professional Terminal</p>
+          <div className="mt-2.5">
+            <h2 className="text-xs font-bold tracking-wider text-[#F5F5F5] uppercase">
+              The Trading Journal
+            </h2>
+            <p className="text-[10px] font-medium tracking-widest text-emerald-400 mt-0.5 uppercase">
+              Track • Analyze • Grow
+            </p>
           </div>
         </div>
 
@@ -137,12 +155,16 @@ export const Navigation: React.FC = () => {
       </aside>
 
       {/* ── Mobile Top Header ── */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-[#15181D] border-b border-[#292D33] px-4 flex items-center justify-between z-40">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-emerald-600 flex items-center justify-center text-white">
-            <TrendingUp className="w-4 h-4" />
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-[#15181D] border-b border-[#292D33] px-3 flex items-center justify-between z-40">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-emerald-500/40 bg-[#0D0F12] shadow-sm flex items-center justify-center flex-shrink-0">
+            <img
+              src="/logo.png"
+              alt="The Trading Journal"
+              className="w-full h-full object-cover object-[50%_25%] scale-[1.35]"
+            />
           </div>
-          <span className="font-bold text-sm text-[#F5F5F5]">Trading Journal</span>
+          <span className="text-xs font-bold text-[#F5F5F5] tracking-wide">The Trading Journal</span>
         </div>
 
         <div className="flex items-center gap-2">

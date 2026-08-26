@@ -6,13 +6,17 @@ export const LoadingScreen: React.FC = () => {
     <div className="min-h-screen bg-[#0D0F12] text-[#F5F5F5] flex">
       {/* Sidebar skeleton */}
       <aside className="hidden lg:flex flex-col w-64 bg-[#15181D] border-r border-[#292D33] fixed left-0 top-0 bottom-0">
-        <div className="p-5 border-b border-[#292D33] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-emerald-500 to-blue-600 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-white" />
+        <div className="py-4 px-3 border-b border-[#292D33] flex flex-col items-center justify-center text-center">
+          <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-[#292D33] bg-[#0D0F12] shadow-xl flex items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="The Trading Journal"
+              className="w-full h-full object-cover object-[50%_25%] scale-[1.35] block"
+            />
           </div>
-          <div>
-            <div className="h-3.5 w-28 bg-[#292D33] rounded animate-pulse" />
-            <div className="h-2.5 w-20 bg-[#1B1F24] rounded animate-pulse mt-1.5" />
+          <div className="mt-2.5">
+            <div className="h-3 w-28 bg-[#1B1F24] rounded animate-pulse mx-auto mb-1" />
+            <div className="h-2 w-20 bg-[#1B1F24] rounded animate-pulse mx-auto" />
           </div>
         </div>
         <div className="p-4 space-y-2 border-b border-[#292D33]">
