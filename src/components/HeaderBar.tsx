@@ -26,17 +26,17 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
   const isPositive = dashboardStats.totalPL >= 0;
 
   return (
-    <div className="bg-[#15181D] border-b border-[#292D33] px-4 py-4 md:px-6 md:py-4 mb-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="bg-[#15181D] border-b border-[#292D33] px-3 py-3 sm:px-4 sm:py-4 md:px-6 mb-4 sm:mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
         {/* Page Title & P/L Chip */}
-        <div className="flex items-center justify-between lg:justify-start gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#F5F5F5]">{title}</h1>
-            {subtitle && <p className="text-xs text-[#A0A6AE] mt-0.5">{subtitle}</p>}
+        <div className="flex flex-wrap items-center justify-between lg:justify-start gap-2 sm:gap-4">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl md:text-2xl font-bold tracking-tight text-[#F5F5F5] truncate">{title}</h1>
+            {subtitle && <p className="text-[11px] sm:text-xs text-[#A0A6AE] mt-0.5 line-clamp-1 sm:line-clamp-none">{subtitle}</p>}
           </div>
 
           <div
-            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 ${
+            className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 shrink-0 ${
               isPositive
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                 : 'bg-red-500/10 border-red-500/30 text-red-400'
@@ -52,12 +52,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
         {/* Account Selector & Date Range Filter Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Account Filter */}
-          <div className="flex items-center gap-1.5 bg-[#1B1F24] border border-[#292D33] rounded-lg px-2.5 py-1.5 text-xs text-[#A0A6AE]">
-            <Wallet className="w-3.5 h-3.5 text-[#6F7680]" />
+          <div className="flex items-center gap-1.5 bg-[#1B1F24] border border-[#292D33] rounded-lg px-2 sm:px-2.5 py-1.5 text-xs text-[#A0A6AE]">
+            <Wallet className="w-3.5 h-3.5 text-[#6F7680] shrink-0" />
             <select
               value={activeAccountId}
               onChange={(e) => setActiveAccountId(e.target.value)}
-              className="bg-transparent text-[#F5F5F5] focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent text-[#F5F5F5] focus:outline-none cursor-pointer pr-1 max-w-[110px] sm:max-w-none text-xs"
             >
               <option value="all" className="bg-[#15181D]">
                 All Accounts
@@ -71,12 +71,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           </div>
 
           {/* Date Range Selector */}
-          <div className="flex items-center gap-1.5 bg-[#1B1F24] border border-[#292D33] rounded-lg px-2.5 py-1.5 text-xs text-[#A0A6AE]">
-            <Calendar className="w-3.5 h-3.5 text-[#6F7680]" />
+          <div className="flex items-center gap-1.5 bg-[#1B1F24] border border-[#292D33] rounded-lg px-2 sm:px-2.5 py-1.5 text-xs text-[#A0A6AE]">
+            <Calendar className="w-3.5 h-3.5 text-[#6F7680] shrink-0" />
             <select
               value={dateRangeFilter}
               onChange={(e) => setDateRangeFilter(e.target.value as DateRangeFilter)}
-              className="bg-transparent text-[#F5F5F5] focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent text-[#F5F5F5] focus:outline-none cursor-pointer pr-1 text-xs"
             >
               <option value="today" className="bg-[#15181D]">
                 Today
@@ -130,7 +130,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           {/* Record Trade Action */}
           <button
             onClick={() => setIsAddTradeOpen(true)}
-            className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            className="py-1.5 px-2.5 sm:px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>+ Add Trade</span>

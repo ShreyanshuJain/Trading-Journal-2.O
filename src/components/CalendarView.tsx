@@ -146,15 +146,15 @@ export const CalendarView: React.FC = () => {
         subtitle="Visual daily performance calendar and monthly profit/loss distribution."
       />
 
-      <div className="px-4 md:px-6 space-y-6">
+      <div className="px-3 sm:px-4 md:px-6 space-y-4 sm:space-y-6">
         {/* Calendar Navigation & Monthly Summary */}
-        <div className="bg-[#15181D] border border-[#292D33] rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
+        <div className="bg-[#15181D] border border-[#292D33] rounded-xl p-3 sm:p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <select
                 value={month}
                 onChange={(e) => setCurrentDate(new Date(year, parseInt(e.target.value, 10), 1))}
-                className="bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] font-bold text-sm rounded-lg px-2.5 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                className="bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] font-bold text-xs sm:text-sm rounded-lg px-2 sm:px-2.5 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
                 {monthNames.map((name, idx) => (
                   <option key={idx} value={idx}>
@@ -166,7 +166,7 @@ export const CalendarView: React.FC = () => {
               <select
                 value={year}
                 onChange={(e) => setCurrentDate(new Date(parseInt(e.target.value, 10), month, 1))}
-                className="bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] font-bold text-sm rounded-lg px-2.5 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                className="bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] font-bold text-xs sm:text-sm rounded-lg px-2 sm:px-2.5 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
                 {[2023, 2024, 2025, 2026, 2027, 2028].map((y) => (
                   <option key={y} value={y}>
@@ -182,11 +182,11 @@ export const CalendarView: React.FC = () => {
                 className="p-1 rounded text-[#A0A6AE] hover:text-[#F5F5F5] hover:bg-[#292D33] cursor-pointer"
                 title="Previous Month"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
               <button
                 onClick={handleToday}
-                className="px-2 py-0.5 rounded text-xs font-semibold text-emerald-400 hover:bg-[#292D33] cursor-pointer"
+                className="px-2 py-0.5 rounded text-[11px] sm:text-xs font-semibold text-emerald-400 hover:bg-[#292D33] cursor-pointer"
               >
                 Today
               </button>
@@ -195,29 +195,31 @@ export const CalendarView: React.FC = () => {
                 className="p-1 rounded text-[#A0A6AE] hover:text-[#F5F5F5] hover:bg-[#292D33] cursor-pointer"
                 title="Next Month"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
 
           {/* Monthly Totals Badge */}
-          <div className="flex items-center gap-4 text-xs font-semibold">
-            <div className="bg-[#1B1F24] border border-[#292D33] px-3 py-1.5 rounded-lg">
-              <span className="text-[#6F7680] block text-[10px] uppercase">Monthly Trades</span>
-              <span className="text-[#F5F5F5] font-bold">{monthlyStats.monthlyTrades} Trades</span>
+          <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-4 text-xs font-semibold w-full lg:w-auto">
+            <div className="bg-[#1B1F24] border border-[#292D33] p-2 sm:px-3 sm:py-1.5 rounded-lg text-center sm:text-left">
+              <span className="text-[#6F7680] block text-[9px] sm:text-[10px] uppercase truncate">Trades</span>
+              <span className="text-[#F5F5F5] font-bold text-xs sm:text-sm">{monthlyStats.monthlyTrades}</span>
             </div>
 
-            <div className="bg-[#1B1F24] border border-[#292D33] px-3 py-1.5 rounded-lg">
-              <span className="text-[#6F7680] block text-[10px] uppercase">Monthly Win/Loss</span>
-              <span className="text-emerald-400 font-bold">{monthlyStats.monthlyWins}W</span>
-              <span className="text-[#6F7680]"> / </span>
-              <span className="text-red-400 font-bold">{monthlyStats.monthlyLosses}L</span>
+            <div className="bg-[#1B1F24] border border-[#292D33] p-2 sm:px-3 sm:py-1.5 rounded-lg text-center sm:text-left">
+              <span className="text-[#6F7680] block text-[9px] sm:text-[10px] uppercase truncate">Win/Loss</span>
+              <div className="text-xs sm:text-sm font-bold truncate">
+                <span className="text-emerald-400">{monthlyStats.monthlyWins}W</span>
+                <span className="text-[#6F7680]"> / </span>
+                <span className="text-red-400">{monthlyStats.monthlyLosses}L</span>
+              </div>
             </div>
 
-            <div className="bg-[#1B1F24] border border-[#292D33] px-3 py-1.5 rounded-lg">
-              <span className="text-[#6F7680] block text-[10px] uppercase">Monthly Net P/L</span>
+            <div className="bg-[#1B1F24] border border-[#292D33] p-2 sm:px-3 sm:py-1.5 rounded-lg text-center sm:text-left">
+              <span className="text-[#6F7680] block text-[9px] sm:text-[10px] uppercase truncate">Net P/L</span>
               <span
-                className={`text-sm font-bold ${
+                className={`text-xs sm:text-sm font-bold block truncate ${
                   monthlyStats.monthlyPL >= 0 ? 'text-emerald-400' : 'text-red-400'
                 }`}
               >
@@ -227,18 +229,18 @@ export const CalendarView: React.FC = () => {
           </div>
         </div>
 
-        {/* Calendar Grid Container */}
-        <div className="bg-[#15181D] border border-[#292D33] rounded-xl overflow-x-auto shadow-xl">
-          <div className="min-w-[700px]">
-            {/* Day Names Header */}
-            <div className="grid grid-cols-7 bg-[#1B1F24] border-b border-[#292D33] text-center text-[11px] font-bold uppercase text-[#6F7680] py-2.5">
-              <div>Sun</div>
-              <div>Mon</div>
-              <div>Tue</div>
-              <div>Wed</div>
-              <div>Thu</div>
-              <div>Fri</div>
-              <div>Sat</div>
+        {/* Calendar Grid Container (Fluid for mobile viewports) */}
+        <div className="w-full bg-[#15181D] border border-[#292D33] rounded-xl overflow-hidden shadow-xl">
+          <div className="w-full">
+            {/* Day Names Header with Responsive Single-Letter on Narrow Screens */}
+            <div className="grid grid-cols-7 bg-[#1B1F24] border-b border-[#292D33] text-center text-[10px] sm:text-[11px] font-bold uppercase text-[#6F7680] py-2 sm:py-2.5">
+              <div><span className="sm:hidden">S</span><span className="hidden sm:inline">Sun</span></div>
+              <div><span className="sm:hidden">M</span><span className="hidden sm:inline">Mon</span></div>
+              <div><span className="sm:hidden">T</span><span className="hidden sm:inline">Tue</span></div>
+              <div><span className="sm:hidden">W</span><span className="hidden sm:inline">Wed</span></div>
+              <div><span className="sm:hidden">T</span><span className="hidden sm:inline">Thu</span></div>
+              <div><span className="sm:hidden">F</span><span className="hidden sm:inline">Fri</span></div>
+              <div><span className="sm:hidden">S</span><span className="hidden sm:inline">Sat</span></div>
             </div>
 
             {/* Grid Cells */}
@@ -257,7 +259,7 @@ export const CalendarView: React.FC = () => {
                         setIsAddTradeOpen(true);
                       }
                     }}
-                    className={`min-h-[110px] p-2 flex flex-col justify-between transition-all cursor-pointer min-w-0 overflow-hidden relative ${
+                    className={`min-h-[58px] sm:min-h-[90px] md:min-h-[110px] p-1 sm:p-2 flex flex-col justify-between transition-all cursor-pointer min-w-0 overflow-hidden relative ${
                       !cell.isCurrentMonth
                         ? 'bg-[#0D0F12]/40 opacity-40'
                         : hasTrades
@@ -270,7 +272,7 @@ export const CalendarView: React.FC = () => {
                     {/* Top Cell Header */}
                     <div className="flex items-center justify-between gap-1 min-w-0 w-full">
                       <span
-                        className={`text-xs font-bold shrink-0 ${
+                        className={`text-[10px] sm:text-xs font-bold shrink-0 ${
                           cell.isCurrentMonth ? 'text-[#F5F5F5]' : 'text-[#6F7680]'
                         }`}
                       >
@@ -279,41 +281,54 @@ export const CalendarView: React.FC = () => {
 
                       {hasTrades && (
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded truncate max-w-[75%] shrink-0 text-right ${
+                          className={`text-[8px] sm:text-[10px] font-bold px-0.5 sm:px-1.5 py-0.5 rounded truncate max-w-[80%] shrink-0 text-right ${
                             dayData.dailyPL >= 0
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                               : 'bg-red-500/20 text-red-400 border border-red-500/30'
                           }`}
                           title={`${dayData.dailyPL >= 0 ? '+' : ''}$${dayData.dailyPL.toLocaleString()}`}
                         >
-                          {dayData.dailyPL >= 0 ? '+' : ''}${dayData.dailyPL.toLocaleString()}
+                          <span className="sm:hidden">{dayData.dailyPL >= 0 ? '+' : ''}${Math.round(dayData.dailyPL)}</span>
+                          <span className="hidden sm:inline">{dayData.dailyPL >= 0 ? '+' : ''}${dayData.dailyPL.toLocaleString()}</span>
                         </span>
                       )}
                     </div>
 
-                    {/* Trades Chips */}
-                    <div className="space-y-1 my-1.5 min-w-0 w-full overflow-hidden">
-                      {hasTrades &&
-                        dayData.trades.slice(0, 2).map((t) => (
-                          <div
-                            key={t.id}
-                            className="px-1.5 py-0.5 rounded bg-[#1B1F24] border border-[#292D33] text-[10px] flex items-center justify-between gap-1 min-w-0 overflow-hidden"
-                          >
-                            <span className="font-bold text-[#F5F5F5] truncate min-w-0">{t.symbol}</span>
-                            <span
-                              className={`font-semibold shrink-0 text-[10px] ${
-                                t.netPL >= 0 ? 'text-emerald-400' : 'text-red-400'
-                              }`}
-                            >
-                              {t.netPL >= 0 ? '+' : ''}${t.netPL.toLocaleString()}
-                            </span>
+                    {/* Trades Chips / Mobile Dot Indicator */}
+                    <div className="space-y-1 my-0.5 sm:my-1.5 min-w-0 w-full overflow-hidden">
+                      {hasTrades && (
+                        <>
+                          {/* Mobile compact indicator */}
+                          <div className="sm:hidden flex items-center justify-center gap-1 mt-0.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${dayData.dailyPL >= 0 ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                            <span className="text-[8px] text-[#A0A6AE] font-mono">{dayData.trades.length}t</span>
                           </div>
-                        ))}
 
-                      {hasTrades && dayData.trades.length > 2 && (
-                        <span className="text-[9px] text-[#A0A6AE] block text-center font-medium truncate">
-                          +{dayData.trades.length - 2} more
-                        </span>
+                          {/* Tablet/Desktop trade chips */}
+                          <div className="hidden sm:block space-y-1">
+                            {dayData.trades.slice(0, 2).map((t) => (
+                              <div
+                                key={t.id}
+                                className="px-1.5 py-0.5 rounded bg-[#1B1F24] border border-[#292D33] text-[10px] flex items-center justify-between gap-1 min-w-0 overflow-hidden"
+                              >
+                                <span className="font-bold text-[#F5F5F5] truncate min-w-0">{t.symbol}</span>
+                                <span
+                                  className={`font-semibold shrink-0 text-[10px] ${
+                                    t.netPL >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                  }`}
+                                >
+                                  {t.netPL >= 0 ? '+' : ''}${t.netPL.toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+
+                            {dayData.trades.length > 2 && (
+                              <span className="text-[9px] text-[#A0A6AE] block text-center font-medium truncate">
+                                +{dayData.trades.length - 2} more
+                              </span>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
 

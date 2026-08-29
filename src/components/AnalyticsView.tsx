@@ -269,12 +269,12 @@ export const AnalyticsView: React.FC = () => {
         subtitle="Live quantitative analytics breakdown across account equity, trades, risk rules, and trading execution."
       />
 
-      <div className="px-4 md:px-6 space-y-5">
+      <div className="px-3 sm:px-4 md:px-6 space-y-4 sm:space-y-5">
         {/* Navigation Tabs for Analytics View */}
-        <div className="flex border-b border-[#22252B] bg-[#14161B] p-1.5 rounded-xl overflow-x-auto text-xs font-semibold scrollbar-none">
+        <div className="w-full flex border-b border-[#22252B] bg-[#14161B] p-1.5 rounded-xl overflow-x-auto text-xs font-semibold scrollbar-none max-w-full">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+            className={`py-2 px-3 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               activeTab === 'overview'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
@@ -284,7 +284,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('strategies')}
-            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+            className={`py-2 px-3 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               activeTab === 'strategies'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
@@ -294,7 +294,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('pairs')}
-            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+            className={`py-2 px-3 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               activeTab === 'pairs'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
@@ -304,7 +304,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('sessions')}
-            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+            className={`py-2 px-3 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               activeTab === 'sessions'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
@@ -314,7 +314,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('days')}
-            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+            className={`py-2 px-3 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               activeTab === 'days'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
@@ -324,7 +324,7 @@ export const AnalyticsView: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('news')}
-            className={`py-2 px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+            className={`py-2 px-3 sm:px-4 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               activeTab === 'news'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-[#A0A6AE] hover:text-[#F5F5F5]'
@@ -338,48 +338,48 @@ export const AnalyticsView: React.FC = () => {
             TAB 1: LIVE ANALYTICS DASHBOARD (MATCHING THE SCREENSHOT EXACTLY)
         ══════════════════════════════════════════════════════════════════════════════ */}
         {activeTab === 'overview' && (
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {/* Top Row: Account Balance Chart (Left) + Trades Table (Right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
               {/* ── Left Column (Account Balance + Daily Summary) ── */}
-              <div className="lg:col-span-6 xl:col-span-6 space-y-5 flex flex-col justify-between">
+              <div className="lg:col-span-6 xl:col-span-6 space-y-4 sm:space-y-5 flex flex-col justify-between">
                 {/* 1. Account Balance Card */}
-                <div className="bg-[#14161C] border border-[#22252C] rounded-2xl p-5 shadow-xl">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-2xl p-3.5 sm:p-5 shadow-xl">
                   {/* Card Header with Inline Stats */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                    <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                      <h3 className="font-bold text-[#F5F5F5] text-base tracking-tight">Account Balance</h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+                      <h3 className="font-bold text-[#F5F5F5] text-sm sm:text-base tracking-tight">Account Balance</h3>
 
-                      <div className="flex items-center gap-4 sm:gap-5 text-xs">
+                      <div className="flex items-center gap-3 sm:gap-5 text-xs">
                         {/* Current P&L */}
                         <div>
-                          <div className="text-[11px] text-[#787F8B] flex items-center gap-1">
+                          <div className="text-[10px] sm:text-[11px] text-[#787F8B] flex items-center gap-1">
                             <span>Current P&L</span>
                             <HelpCircle className="w-3 h-3 text-[#5A606C]" />
                           </div>
-                          <div className={`font-bold text-sm sm:text-base ${currentPeriodPL >= 0 ? 'text-[#C4FF00]' : 'text-[#C4FF00]'}`}>
+                          <div className={`font-bold text-xs sm:text-base ${currentPeriodPL >= 0 ? 'text-[#C4FF00]' : 'text-[#C4FF00]'}`}>
                             {currentPeriodPL >= 0 ? '+' : '-'}${Math.abs(currentPeriodPL).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </div>
 
                         {/* Equity */}
                         <div>
-                          <div className="text-[11px] text-[#787F8B] flex items-center gap-1">
+                          <div className="text-[10px] sm:text-[11px] text-[#787F8B] flex items-center gap-1">
                             <span>Equity</span>
                             <HelpCircle className="w-3 h-3 text-[#5A606C]" />
                           </div>
-                          <div className="font-bold text-sm sm:text-base text-[#F5F5F5]">
+                          <div className="font-bold text-xs sm:text-base text-[#F5F5F5]">
                             ${currentEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </div>
 
                         {/* Closed Balance */}
-                        <div className="hidden sm:block">
-                          <div className="text-[11px] text-[#787F8B] flex items-center gap-1">
+                        <div className="hidden xs:block sm:block">
+                          <div className="text-[10px] sm:text-[11px] text-[#787F8B] flex items-center gap-1">
                             <span>Closed Balance</span>
                             <HelpCircle className="w-3 h-3 text-[#5A606C]" />
                           </div>
-                          <div className="font-bold text-sm sm:text-base text-[#F5F5F5]">
+                          <div className="font-bold text-xs sm:text-base text-[#F5F5F5]">
                             ${closedBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </div>
@@ -390,7 +390,7 @@ export const AnalyticsView: React.FC = () => {
                     <div className="relative">
                       <button
                         onClick={() => setPeriodDropdownOpen(!periodDropdownOpen)}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#1B1E25] border border-[#2B2F38] text-xs font-semibold text-[#D0D4DC] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+                        className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-[#1B1E25] border border-[#2B2F38] text-[11px] sm:text-xs font-semibold text-[#D0D4DC] hover:text-white flex items-center gap-1.5 sm:gap-2 transition-colors cursor-pointer"
                       >
                         <span className="capitalize">{dateRangeFilter === 'all' ? 'All' : dateRangeFilter.replace('_', ' ')}</span>
                         <ChevronDown className="w-3.5 h-3.5 text-[#787F8B]" />
@@ -417,8 +417,8 @@ export const AnalyticsView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Chart Area */}
-                  <div className="h-60 sm:h-64 w-full pt-2">
+                  {/* Chart Area - Explicit Fixed Height on Direct Parent */}
+                  <div className="h-56 sm:h-64 w-full pt-2">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <defs>
@@ -479,10 +479,10 @@ export const AnalyticsView: React.FC = () => {
                 </div>
 
                 {/* 2. Daily Summary Card */}
-                <div className="bg-[#14161C] border border-[#22252C] rounded-2xl p-5 shadow-xl">
-                  <h3 className="font-bold text-[#F5F5F5] text-base mb-3">Daily Summary</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-2xl p-3.5 sm:p-5 shadow-xl">
+                  <h3 className="font-bold text-[#F5F5F5] text-sm sm:text-base mb-3">Daily Summary</h3>
+                  <div className="w-full overflow-x-auto max-w-full">
+                    <table className="w-full text-left text-xs min-w-[320px]">
                       <thead>
                         <tr className="text-[#787F8B] font-medium border-b border-[#22252C] pb-2">
                           <th className="py-2 px-3 font-normal">Date</th>
@@ -702,11 +702,11 @@ export const AnalyticsView: React.FC = () => {
             </div>
 
             {/* ── Bottom Section: PnL from HWM + Win/Loss Rate Gauge + KPI Grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
               {/* Card 1: PnL From All Time Hwm Equity */}
-              <div className="lg:col-span-3 bg-[#14161C] border border-[#22252C] rounded-2xl p-5 shadow-xl flex flex-col justify-between h-full min-h-[175px]">
+              <div className="lg:col-span-3 bg-[#14161C] border border-[#22252C] rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col justify-between h-full min-h-[160px] sm:min-h-[175px]">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs text-[#787F8B] font-medium flex items-center gap-1">
+                  <div className="text-[11px] sm:text-xs text-[#787F8B] font-medium flex items-center gap-1">
                     <span>PnL From All Time Hwm Equity</span>
                     <HelpCircle className="w-3 h-3 text-[#5A606C]" />
                   </div>
@@ -716,7 +716,7 @@ export const AnalyticsView: React.FC = () => {
                 </div>
 
                 <div className="my-2">
-                  <div className="text-2xl font-bold text-[#F5F5F5] tracking-tight">
+                  <div className="text-xl sm:text-2xl font-bold text-[#F5F5F5] tracking-tight">
                     {pnlFromHwm >= 0 ? '+' : '-'}${Math.abs(pnlFromHwm).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   {/* Subtle Progress Bar */}
@@ -728,16 +728,16 @@ export const AnalyticsView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-[#787F8B] pt-2 border-t border-[#1D2027]">
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-[#787F8B] pt-2 border-t border-[#1D2027]">
                   <span>Current Equity <strong className="text-[#D0D4DC]">${currentEquity.toLocaleString()}</strong></span>
                   <span>HWM <strong className="text-[#D0D4DC]">${hwm.toLocaleString()}</strong></span>
                 </div>
               </div>
 
               {/* Card 2: Win / Loss Rate Gauge */}
-              <div className="lg:col-span-3 bg-[#14161C] border border-[#22252C] rounded-2xl p-5 shadow-xl flex flex-col justify-between h-full min-h-[175px]">
+              <div className="lg:col-span-3 bg-[#14161C] border border-[#22252C] rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col justify-between h-full min-h-[160px] sm:min-h-[175px]">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs text-[#787F8B] font-medium flex items-center gap-1">
+                  <div className="text-[11px] sm:text-xs text-[#787F8B] font-medium flex items-center gap-1">
                     <span>Win / Loss Rate</span>
                     <HelpCircle className="w-3 h-3 text-[#5A606C]" />
                   </div>
@@ -748,7 +748,7 @@ export const AnalyticsView: React.FC = () => {
 
                 {/* Semicircle Neon Purple Gauge */}
                 <div className="flex flex-col items-center justify-center my-1 relative">
-                  <svg width="160" height="85" viewBox="0 0 160 85" className="overflow-visible">
+                  <svg width="150" height="80" viewBox="0 0 160 85" className="overflow-visible">
                     {/* Background Track Arc */}
                     <path
                       d="M 12 80 A 68 68 0 0 1 148 80"
@@ -771,116 +771,116 @@ export const AnalyticsView: React.FC = () => {
                   </svg>
                   {/* Win Rate Text Center */}
                   <div className="absolute bottom-0 text-center">
-                    <span className="text-xl font-black text-white">{dashboardStats.winRate}%</span>
+                    <span className="text-lg sm:text-xl font-black text-white">{dashboardStats.winRate}%</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-[#787F8B] pt-1">
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-[#787F8B] pt-1">
                   <span>Wins: <strong className="text-emerald-400">{dashboardStats.winningTrades}</strong></span>
                   <span>Losses: <strong className="text-rose-400">{dashboardStats.losingTrades}</strong></span>
                 </div>
               </div>
 
               {/* Card 3: 2-Row Stat Cards Grid */}
-              <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+              <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3">
                 {/* Row 1 */}
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Net Profit</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className={`text-base font-bold mt-1 ${dashboardStats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <div className={`text-sm sm:text-base font-bold mt-1 truncate ${dashboardStats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {dashboardStats.netProfit >= 0 ? '+' : '-'}${Math.abs(dashboardStats.netProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Gross Profit</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-[#F5F5F5] mt-1">
+                  <div className="text-sm sm:text-base font-bold text-[#F5F5F5] mt-1 truncate">
                     ${dashboardStats.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Gross Loss</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-[#F5F5F5] mt-1">
+                  <div className="text-sm sm:text-base font-bold text-[#F5F5F5] mt-1 truncate">
                     ${dashboardStats.grossLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
                 <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Profit Factor</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-[#F5F5F5] mt-1">
+                  <div className="text-sm sm:text-base font-bold text-[#F5F5F5] mt-1 truncate">
                     {dashboardStats.profitFactor.toFixed(2)}
                   </div>
                 </div>
 
                 <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Best Profit</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-emerald-400 mt-1">
+                  <div className="text-sm sm:text-base font-bold text-emerald-400 mt-1 truncate">
                     ${bestProfit.toFixed(2)}
                   </div>
                 </div>
 
                 {/* Row 2 */}
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Biggest Loss</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-rose-400 mt-1">
+                  <div className="text-sm sm:text-base font-bold text-rose-400 mt-1 truncate">
                     ${biggestLoss.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Expectancy</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className={`text-base font-bold mt-1 ${dashboardStats.expectancy >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <div className={`text-sm sm:text-base font-bold mt-1 truncate ${dashboardStats.expectancy >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {dashboardStats.expectancy >= 0 ? '+' : '-'}${Math.abs(dashboardStats.expectancy).toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Avg. Trade Size</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-[#F5F5F5] mt-1">
+                  <div className="text-sm sm:text-base font-bold text-[#F5F5F5] mt-1 truncate">
                     ${avgTradeSize.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Avg R:R</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-[#F5F5F5] mt-1">
+                  <div className="text-sm sm:text-base font-bold text-[#F5F5F5] mt-1 truncate">
                     1 : {dashboardStats.avgRiskReward}R
                   </div>
                 </div>
 
-                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3.5 shadow-lg">
-                  <div className="text-[11px] text-[#787F8B] font-medium flex items-center gap-1">
+                <div className="bg-[#14161C] border border-[#22252C] rounded-xl p-3 sm:p-3.5 shadow-lg">
+                  <div className="text-[10px] sm:text-[11px] text-[#787F8B] font-medium flex items-center gap-1 truncate">
                     <span>Max Drawdown</span>
-                    <HelpCircle className="w-3 h-3 text-[#5A606C]" />
+                    <HelpCircle className="w-3 h-3 text-[#5A606C] shrink-0" />
                   </div>
-                  <div className="text-base font-bold text-rose-400 mt-1">
+                  <div className="text-sm sm:text-base font-bold text-rose-400 mt-1 truncate">
                     -{dashboardStats.maxDrawdownPercent}%
                   </div>
                 </div>
