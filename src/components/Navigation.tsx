@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useJournal, NavigationPage } from '../context/JournalContext';
 import { useAuth } from '../context/AuthContext';
 import { UserMenu } from './UserMenu';
@@ -19,6 +19,7 @@ import {
   LogOut,
   MoreHorizontal,
   X,
+  User as UserIcon,
 } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
@@ -34,21 +35,37 @@ export const Navigation: React.FC = () => {
   } = useJournal();
   const { currentUser, logout } = useAuth();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const mobileProfileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (mobileProfileRef.current && !mobileProfileRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isProfileMenuOpen]);
 
   const navItems: { id: NavigationPage; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'journal', label: 'Journal', icon: BookOpen },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
     { id: 'gallery', label: 'Trade Gallery', icon: GalleryIcon },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'strategies', label: 'Strategies & Tags', icon: Layers },
     { id: 'risk', label: 'Risk Management', icon: ShieldAlert },
     { id: 'accounts', label: 'Accounts', icon: Wallet },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 
-  const primaryNavItems = navItems.slice(0, 3);
-  const overflowNavItems = navItems.slice(3);
+  const primaryNavItems = navItems.slice(0, 5);
+  const overflowNavItems = navItems.slice(5);
   const isMoreActive = overflowNavItems.some((item) => item.id === currentPage);
 
   return (
@@ -196,21 +213,116 @@ export const Navigation: React.FC = () => {
             <Plus className="w-3.5 h-3.5" />
             <span>Add Trade</span>
           </button>
-          {/* Mobile user avatar */}
-          {currentUser?.photoURL && (
-            <img
-              src={currentUser.photoURL}
-              alt="User"
-              className="w-7 h-7 rounded-full border border-[#292D33] cursor-pointer"
-              onClick={logout}
-              title="Sign out"
-            />
-          )}
+          {/* Mobile user profile button & popover menu */}
+          <div ref={mobileProfileRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+              className="flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
+              title="User Account & Settings"
+              aria-label="User Account Menu"
+            >
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.displayName || 'User Profile'}
+                  className="w-8 h-8 rounded-full border border-[#292D33] hover:border-emerald-500/60 object-cover transition-colors"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-emerald-600 border border-[#292D33] flex items-center justify-center text-white text-xs font-bold">
+                  {currentUser?.displayName?.[0] ?? currentUser?.email?.[0] ?? 'U'}
+                </div>
+              )}
+            </button>
+
+            {/* Mobile Profile Dropdown Popover */}
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-[#1B1F24] border border-[#292D33] rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in-50 zoom-in-95 duration-150">
+                {/* User Info Header */}
+                <div className="p-3.5 border-b border-[#292D33] bg-[#14161C]">
+                  <div className="flex items-center gap-2.5">
+                    {currentUser?.photoURL ? (
+                      <img
+                        src={currentUser.photoURL}
+                        alt="Profile"
+                        className="w-9 h-9 rounded-full border border-[#292D33] object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {currentUser?.displayName?.[0] ?? currentUser?.email?.[0] ?? 'U'}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-[#F5F5F5] truncate">
+                        {currentUser?.displayName ?? 'Trader'}
+                      </p>
+                      <p className="text-[11px] text-[#A0A6AE] truncate">
+                        {currentUser?.email}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation Items */}
+                <div className="p-1.5 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage('settings');
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[#D0D4DC] hover:text-white hover:bg-[#292D33] transition-colors cursor-pointer text-left"
+                  >
+                    <SettingsIcon className="w-4 h-4 text-[#A0A6AE]" />
+                    <span>Settings & Preferences</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage('accounts');
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[#D0D4DC] hover:text-white hover:bg-[#292D33] transition-colors cursor-pointer text-left"
+                  >
+                    <Wallet className="w-4 h-4 text-[#A0A6AE]" />
+                    <span>Trading Accounts</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage('risk');
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[#D0D4DC] hover:text-white hover:bg-[#292D33] transition-colors cursor-pointer text-left"
+                  >
+                    <ShieldAlert className="w-4 h-4 text-[#A0A6AE]" />
+                    <span>Risk Management Rules</span>
+                  </button>
+
+                  <div className="my-1 border-t border-[#292D33]" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer text-left"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {/* ── Mobile Bottom Navigation ── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#15181D] border-t border-[#292D33] px-2 flex items-center justify-around z-40">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#15181D] border-t border-[#292D33] px-1 sm:px-2 flex items-center justify-around z-40">
         {primaryNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -218,12 +330,14 @@ export const Navigation: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
-              className={`flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors cursor-pointer ${
+              className={`flex-1 flex flex-col items-center justify-center h-12 max-w-[56px] sm:max-w-[68px] rounded-lg transition-colors cursor-pointer ${
                 isActive ? 'text-emerald-400 bg-[#1B1F24]' : 'text-[#6F7680] hover:text-[#A0A6AE]'
               }`}
             >
               <Icon className="w-4 h-4" />
-              <span className="text-[10px] mt-1 truncate max-w-[50px]">{item.label}</span>
+              <span className="text-[9.5px] sm:text-[10px] mt-1 truncate max-w-full font-medium">
+                {item.label === 'Trade Gallery' ? 'Gallery' : item.label}
+              </span>
             </button>
           );
         })}
@@ -231,21 +345,12 @@ export const Navigation: React.FC = () => {
         {/* Mobile "More" Button */}
         <button
           onClick={() => setIsMoreOpen(true)}
-          className={`flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors cursor-pointer ${
+          className={`flex-1 flex flex-col items-center justify-center h-12 max-w-[56px] sm:max-w-[68px] rounded-lg transition-colors cursor-pointer ${
             isMoreActive ? 'text-emerald-400 bg-[#1B1F24]' : 'text-[#6F7680] hover:text-[#A0A6AE]'
           }`}
         >
           <MoreHorizontal className="w-4 h-4" />
-          <span className="text-[10px] mt-1">More</span>
-        </button>
-
-        {/* Mobile logout */}
-        <button
-          onClick={logout}
-          className="flex flex-col items-center justify-center w-14 h-12 rounded-lg text-[#6F7680] hover:text-red-400 cursor-pointer"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="text-[10px] mt-1">Sign Out</span>
+          <span className="text-[9.5px] sm:text-[10px] mt-1 font-medium">More</span>
         </button>
       </nav>
 

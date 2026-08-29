@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account and profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "Logged trade record with metrics, execution details, and psychology notes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "symbol": { "type": "string" },
+        "direction": { "type": "string", "enum": ["BUY", "SELL"] },
+        "session": { "type": "string" },
+        "strategyId": { "type": "string" },
+        "setup": { "type": "string" },
+        "entry": { "type": "number" },
+        "stopLoss": { "type": "number" },
+        "takeProfit": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "lotSize": { "type": "number" },
+        "riskPercent": { "type": "number" },
+        "riskAmount": { "type": "number" },
+        "plannedRR": { "type": "number" },
+        "realizedRR": { "type": "number" },
+        "grossPL": { "type": "number" },
+        "commission": { "type": "number" },
+        "fees": { "type": "number" },
+        "netPL": { "type": "number" },
+        "outcome": { "type": "string", "enum": ["WIN", "LOSS", "BREAKEVEN", "PARTIAL", "OPEN"] },
+        "notes": { "type": "string" },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "symbol", "direction", "netPL", "outcome", "createdAt"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Trading account definition with initial starting balance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "broker": { "type": "string" },
+        "startingBalance": { "type": "number" },
+        "currency": { "type": "string" },
+        "type": { "type": "string", "enum": ["Personal", "Demo", "Funded", "Live"] }
+      },
+      "required": ["id", "name", "startingBalance", "currency"]
+    },
+    "Strategy": {
+      "title": "Strategy",
+      "description": "Trading setup strategy definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "color": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Tag": {
+      "title": "Tag",
+      "description": "Custom organizational trade tag",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences, risk limits, and display settings",
+      "type": "object",
+      "properties": {
+        "defaultAccountId": { "type": "string" },
+        "baseCurrency": { "type": "string" },
+        "timezone": { "type": "string" },
+        "defaultRiskPercent": { "type": "number" },
+        "maxRiskPercent": { "type": "number" },
+        "maxDailyLossPercent": { "type": "number" },
+        "maxDrawdownPercent": { "type": "number" },
+        "maxConsecutiveLosses": { "type": "number" },
+        "defaultLotSize": { "type": "number" },
+        "defaultCommission": { "type": "number" },
+        "enableNotifications": { "type": "boolean" },
+        "theme": { "type": "string", "enum": ["dark", "light"] }
+      },
+      "required": ["baseCurrency", "timezone", "defaultRiskPercent"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profile and authentication metadata"
+    },
+    "/users/{userId}/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "User trade log records and metrics"
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": "Account",
+      "description": "User trading accounts"
+    },
+    "/users/{userId}/strategies/{strategyId}": {
+      "schema": "Strategy",
+      "description": "User trading strategies"
+    },
+    "/users/{userId}/tags/{tagId}": {
+      "schema": "Tag",
+      "description": "User trade tags"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserSettings",
+      "description": "User preferences and risk parameters"
+    }
+  }
+}

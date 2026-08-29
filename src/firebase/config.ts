@@ -17,10 +17,23 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const firestore = firebaseAppletConfig.firestoreDatabaseId
+export const firestore = (firebaseAppletConfig.firestoreDatabaseId && firebaseAppletConfig.firestoreDatabaseId !== '(default)')
   ? getFirestore(app, firebaseAppletConfig.firestoreDatabaseId)
   : getFirestore(app);
 export const db = firestore;
 export const storage = getStorage(app);
+
+// Test Firestore connection on boot
+(async function testConnection() {
+  try {
+    const { doc, getDocFromServer } = await import('firebase/firestore');
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn("Please check your Firebase configuration or network status.");
+    }
+  }
+})();
+
 export default app;
 
