@@ -254,23 +254,35 @@ export const Navigation: React.FC = () => {
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity cursor-pointer"
             onClick={() => setIsMoreOpen(false)}
+            aria-label="Close menu backdrop"
           />
 
           {/* Bottom Sheet */}
-          <div className="relative bg-[#15181D] border-t border-[#292D33] rounded-t-2xl p-5 shadow-2xl z-10 max-h-[80vh] overflow-y-auto space-y-4 animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-[#292D33]">
-              <h3 className="text-sm font-bold text-[#F5F5F5]">More Sections</h3>
+          <div
+            className="relative bg-[#15181D] border-t border-[#292D33] rounded-t-2xl p-5 shadow-2xl z-10 max-h-[85vh] overflow-y-auto space-y-4 animate-in slide-in-from-bottom duration-200"
+            style={{
+              paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            <div className="sticky top-0 bg-[#15181D]/95 backdrop-blur-sm -mt-2 pt-2 pb-3 border-b border-[#292D33] flex items-center justify-between z-20">
+              <div>
+                <h3 className="text-sm font-bold text-[#F5F5F5]">More Sections</h3>
+                <p className="text-[11px] text-[#6F7680]">Select a section to navigate</p>
+              </div>
               <button
+                type="button"
                 onClick={() => setIsMoreOpen(false)}
-                className="p-1.5 rounded-lg bg-[#1B1F24] text-[#A0A6AE] hover:text-white cursor-pointer"
+                className="p-2 rounded-xl bg-[#1B1F24] hover:bg-[#22272E] text-[#A0A6AE] hover:text-white border border-[#292D33] transition-colors cursor-pointer"
+                aria-label="Close more sections"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
               {overflowNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
@@ -281,10 +293,10 @@ export const Navigation: React.FC = () => {
                       setCurrentPage(item.id);
                       setIsMoreOpen(false);
                     }}
-                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all cursor-pointer min-h-[76px] ${
                       isActive
-                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-sm'
-                        : 'bg-[#1B1F24] border-[#292D33] text-[#A0A6AE] hover:text-white hover:border-[#3E444D]'
+                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-sm ring-1 ring-emerald-500/20'
+                        : 'bg-[#1B1F24] border-[#292D33] text-[#A0A6AE] hover:text-white hover:border-[#3E444D] active:scale-95'
                     }`}
                   >
                     <Icon className={`w-5 h-5 mb-1.5 ${isActive ? 'text-emerald-400' : 'text-[#A0A6AE]'}`} />
