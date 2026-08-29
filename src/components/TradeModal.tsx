@@ -34,7 +34,33 @@ import {
   CheckCircle2,
   Sparkles,
   Maximize2,
+  Clock,
 } from 'lucide-react';
+
+// Helper functions for local date and time formatting
+const getLocalTodayDate = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalCurrentTime = (): string => {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
+const getEstimatedSession = (): TradingSession => {
+  const utcHours = new Date().getUTCHours();
+  if (utcHours >= 12 && utcHours < 16) return 'London/NY Overlap';
+  if (utcHours >= 16 && utcHours < 21) return 'New York';
+  if (utcHours >= 7 && utcHours < 12) return 'London';
+  if (utcHours >= 0 && utcHours < 7) return 'Asia';
+  return 'New York';
+};
 
 interface TradeModalProps {
   isOpen: boolean;
@@ -59,14 +85,21 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
   );
 
   // Form Fields
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [time, setTime] = useState<string>('09:30');
+  const [date, setDate] = useState<string>(getLocalTodayDate);
+  const [time, setTime] = useState<string>(getLocalCurrentTime);
   const [symbol, setSymbol] = useState<string>('XAUUSD');
   const [direction, setDirection] = useState<TradeDirection>('BUY');
-  const [session, setSession] = useState<TradingSession>('New York');
+  const [session, setSession] = useState<TradingSession>(getEstimatedSession);
   const [accountId, setAccountId] = useState<string>('');
   const [strategyId, setStrategyId] = useState<string>('');
   const [setup, setSetup] = useState<string>('');
+
+  // Quick sync to current date/time
+  const handleSetToCurrentDateTime = () => {
+    setDate(getLocalTodayDate());
+    setTime(getLocalCurrentTime());
+    setSession(getEstimatedSession());
+  };
 
   // New Strategy Creation
   const [showNewStrategyInput, setShowNewStrategyInput] = useState<boolean>(false);
@@ -78,11 +111,11 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
   const [takeProfitInput, setTakeProfitInput] = useState<string>('');
   const [exitPriceInput, setExitPriceInput] = useState<string>('');
   const [lotSizeInput, setLotSizeInput] = useState<string>('');
-  const [commissionInput, setCommissionInput] = useState<string>('0');
-  const [feesInput, setFeesInput] = useState<string>('0');
+  const [commissionInput, setCommissionInput] = useState<string>('');
+  const [feesInput, setFeesInput] = useState<string>('');
   const [riskPercentInput, setRiskPercentInput] = useState<string>('1.0');
   const [riskAmountInput, setRiskAmountInput] = useState<string>('');
-  const [netPLInput, setNetPLInput] = useState<string>('0');
+  const [netPLInput, setNetPLInput] = useState<string>('');
   const [outcome, setOutcome] = useState<TradeOutcome>('WIN');
   const [manualOverride, setManualOverride] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
@@ -181,12 +214,12 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
       }
       setManualOverride(true);
     } else {
-      // Default reset for new trade
-      setDate(new Date().toISOString().split('T')[0]);
-      setTime('09:30');
+      // Default reset for new trade with automatic local date & time
+      setDate(getLocalTodayDate());
+      setTime(getLocalCurrentTime());
       setSymbol('XAUUSD');
       setDirection('BUY');
-      setSession('New York');
+      setSession(getEstimatedSession());
       const targetAccId = activeAccountId !== 'all' ? activeAccountId : accounts[0]?.id || '';
       setAccountId(targetAccId);
       setStrategyId(strategies[0]?.id || '');
@@ -196,10 +229,10 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
       setTakeProfitInput('');
       setExitPriceInput('');
       setLotSizeInput('');
-      setCommissionInput('0');
-      setFeesInput('0');
+      setCommissionInput('');
+      setFeesInput('');
       setRiskAmountInput('');
-      setNetPLInput('0');
+      setNetPLInput('');
       setNotes('');
       setScreenshots([]);
       setSelectedTags(['A+ Setup']);
@@ -599,7 +632,18 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
           {activeTab === 'execution' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-[#A0A6AE] mb-1 block">Trade Date</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#A0A6AE]">Trade Date</label>
+                  <button
+                    type="button"
+                    onClick={handleSetToCurrentDateTime}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Auto-sync date, time, and session to now"
+                  >
+                    <Clock className="w-3 h-3" />
+                    <span>Set to Current Time</span>
+                  </button>
+                </div>
                 <input
                   type="date"
                   value={date}
@@ -610,7 +654,10 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[#A0A6AE] mb-1 block">Trade Time</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#A0A6AE]">Trade Time</label>
+                  <span className="text-[10px] text-[#6F7680]">Local Time</span>
+                </div>
                 <input
                   type="time"
                   value={time}
@@ -816,7 +863,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                         step="any"
                         value={netPLInput}
                         onChange={(e) => handleNetPLChange(e.target.value)}
-                        placeholder="0.00"
+                        placeholder=""
                         className={`w-full bg-[#15181D] border rounded-lg pl-7 pr-3 py-2 text-xs font-bold font-mono focus:outline-none cursor-text ${
                           netPL >= 0
                             ? 'border-emerald-500/40 text-emerald-400 focus:border-emerald-500'
@@ -940,7 +987,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={entryInput}
                     onChange={(e) => setEntryInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] font-mono rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -952,7 +999,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={stopLossInput}
                     onChange={(e) => setStopLossInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-red-500/30 text-[#F5F5F5] font-mono rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-500"
                   />
                 </div>
@@ -964,7 +1011,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={takeProfitInput}
                     onChange={(e) => setTakeProfitInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-emerald-500/30 text-[#F5F5F5] font-mono rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -976,7 +1023,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={exitPriceInput}
                     onChange={(e) => setExitPriceInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] font-mono rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -990,7 +1037,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={lotSizeInput}
                     onChange={(e) => setLotSizeInput(e.target.value)}
-                    placeholder="1.0"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -1002,7 +1049,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={riskAmountInput}
                     onChange={(e) => setRiskAmountInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -1014,7 +1061,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={commissionInput}
                     onChange={(e) => setCommissionInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -1026,7 +1073,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, tradeTo
                     step="any"
                     value={feesInput}
                     onChange={(e) => setFeesInput(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>
