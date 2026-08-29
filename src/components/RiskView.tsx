@@ -17,13 +17,13 @@ export const RiskView: React.FC = () => {
   const stopDistance = Math.abs(entryPrice - stopLossPrice);
   const calculatedUnits = stopDistance > 0 ? (riskAmount / stopDistance).toFixed(2) : '0';
 
-  const [maxRiskPerTrade, setMaxRiskPerTrade] = useState(settings.maxPositionRiskPercent || 2);
+  const [maxRiskPerTrade, setMaxRiskPerTrade] = useState(settings.maxRiskPercent || 2);
   const [maxDailyLossPercent, setMaxDailyLossPercent] = useState(settings.maxDailyLossPercent || 5);
 
   const handleSaveRiskRules = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings({
-      maxPositionRiskPercent: maxRiskPerTrade,
+      maxRiskPercent: maxRiskPerTrade,
       maxDailyLossPercent: maxDailyLossPercent,
     });
     showToast('✓ Risk rules saved');

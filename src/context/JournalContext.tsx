@@ -116,6 +116,12 @@ interface JournalContextType {
   settings: UserSettings;
   updateSettings: (newSettings: Partial<UserSettings>) => void;
 
+  // Export, Import & Reset Data
+  exportDataJSON: () => void;
+  exportDataCSV: () => void;
+  importDataJSON: (jsonContent: string) => boolean;
+  resetToDemoData: () => Promise<void>;
+
   // Modals & UI State
   isAddTradeOpen: boolean;
   setIsAddTradeOpen: (open: boolean) => void;
@@ -699,6 +705,190 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       .catch(() => showToast('Failed to save settings.'));
   };
 
+  // ── Export, Import & Reset Data ─────────────────────────────────────────────
+
+  const exportDataJSON = () => {
+    try {
+      const backupData = {
+        accounts: rawAccounts.length > 0 ? rawAccounts : accounts,
+        trades,
+        strategies,
+        tags,
+        settings,
+        exportDate: new Date().toISOString(),
+      };
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `trading-journal-backup-${dateStr}.json`;
+
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('✓ JSON backup exported');
+    } catch (err) {
+      console.error('Failed to export JSON backup:', err);
+      showToast('Failed to export backup.');
+    }
+  };
+
+  const exportDataCSV = () => {
+    try {
+      const headers = [
+        'date',
+        'time',
+        'symbol',
+        'direction',
+        'session',
+        'setup',
+        'entry',
+        'stopLoss',
+        'takeProfit',
+        'exitPrice',
+        'lotSize',
+        'riskPercent',
+        'riskAmount',
+        'plannedRR',
+        'realizedRR',
+        'grossPL',
+        'commission',
+        'fees',
+        'netPL',
+        'outcome',
+        'notes',
+      ];
+
+      const escapeCSV = (val: any): string => {
+        if (val === undefined || val === null) return '';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const rows = trades.map((t) => [
+        t.date || '',
+        t.time || '',
+        t.symbol || '',
+        t.direction || '',
+        t.session || '',
+        t.setup || '',
+        t.entry ?? '',
+        t.stopLoss ?? '',
+        t.takeProfit ?? '',
+        t.exitPrice ?? '',
+        t.lotSize ?? '',
+        t.riskPercent ?? '',
+        t.riskAmount ?? '',
+        t.plannedRR ?? '',
+        t.realizedRR ?? '',
+        t.grossPL ?? '',
+        t.commission ?? '',
+        t.fees ?? '',
+        t.netPL ?? '',
+        t.outcome || '',
+        t.notes || '',
+      ].map(escapeCSV).join(','));
+
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `trading-journal-trades-${dateStr}.csv`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('✓ Trades CSV exported');
+    } catch (err) {
+      console.error('Failed to export CSV trades:', err);
+      showToast('Failed to export CSV.');
+    }
+  };
+
+  const importDataJSON = (jsonContent: string): boolean => {
+    try {
+      if (!jsonContent || typeof jsonContent !== 'string') {
+        return false;
+      }
+      const data = JSON.parse(jsonContent);
+      if (!data || typeof data !== 'object') {
+        return false;
+      }
+
+      if (!Array.isArray(data.trades) || !Array.isArray(data.accounts) || !data.settings) {
+        return false;
+      }
+
+      const importedAccounts = data.accounts as Account[];
+      const importedTrades = data.trades as Trade[];
+      const importedStrategies = (Array.isArray(data.strategies) ? data.strategies : []) as Strategy[];
+      const importedTags = (Array.isArray(data.tags) ? data.tags : []) as Tag[];
+      const importedSettings = (data.settings || initialSettings) as UserSettings;
+
+      // Update in-memory state immediately
+      setRawAccounts(importedAccounts.map((a: any) => {
+        const { currentBalance, ...rest } = a;
+        return rest;
+      }));
+      setTrades(importedTrades);
+      setStrategies(importedStrategies);
+      setTags(importedTags);
+      setSettings(importedSettings);
+
+      // Write each collection back to Firestore under users/{userId}/...
+      if (userId) {
+        (async () => {
+          try {
+            // Write accounts
+            for (const acc of importedAccounts) {
+              const { currentBalance, ...rest } = acc;
+              await setDoc(doc(db, 'users', userId, 'accounts', acc.id), rest);
+            }
+            // Write trades
+            for (const tr of importedTrades) {
+              await setDoc(doc(db, 'users', userId, 'trades', tr.id), tr);
+            }
+            // Write strategies
+            for (const st of importedStrategies) {
+              await setDoc(doc(db, 'users', userId, 'strategies', st.id), st);
+            }
+            // Write tags
+            for (const tg of importedTags) {
+              await setDoc(doc(db, 'users', userId, 'tags', tg.id), tg);
+            }
+            // Write settings
+            await setDoc(doc(db, 'users', userId, 'settings', 'preferences'), importedSettings);
+          } catch (e) {
+            console.error('Error writing imported data to Firestore:', e);
+          }
+        })();
+      }
+
+      showToast('✓ Journal data imported successfully');
+      return true;
+    } catch (err) {
+      console.error('Failed to parse or import JSON:', err);
+      return false;
+    }
+  };
+
+  const resetToDemoData = async () => {
+    return resetDemoData();
+  };
+
   // ── Provider value ─────────────────────────────────────────────────────────
 
   return (
@@ -731,6 +921,10 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
         duplicateTrade,
         deleteTrade,
         resetDemoData,
+        resetToDemoData,
+        exportDataJSON,
+        exportDataCSV,
+        importDataJSON,
         strategies,
         addStrategy,
         updateStrategy,

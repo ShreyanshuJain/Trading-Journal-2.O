@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useJournal, NavigationPage } from '../context/JournalContext';
 import { useAuth } from '../context/AuthContext';
 import { UserMenu } from './UserMenu';
@@ -17,6 +17,8 @@ import {
   Layers,
   ChevronDown,
   LogOut,
+  MoreHorizontal,
+  X,
 } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
@@ -31,6 +33,7 @@ export const Navigation: React.FC = () => {
     filteredTrades,
   } = useJournal();
   const { currentUser, logout } = useAuth();
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const navItems: { id: NavigationPage; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,6 +46,10 @@ export const Navigation: React.FC = () => {
     { id: 'accounts', label: 'Accounts', icon: Wallet },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
+
+  const primaryNavItems = navItems.slice(0, 3);
+  const overflowNavItems = navItems.slice(3);
+  const isMoreActive = overflowNavItems.some((item) => item.id === currentPage);
 
   return (
     <>
@@ -204,15 +211,15 @@ export const Navigation: React.FC = () => {
 
       {/* ── Mobile Bottom Navigation ── */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#15181D] border-t border-[#292D33] px-2 flex items-center justify-around z-40">
-        {navItems.slice(0, 4).map((item) => {
+        {primaryNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
-              className={`flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors ${
-                isActive ? 'text-emerald-400 bg-[#1B1F24]' : 'text-[#6F7680]'
+              className={`flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors cursor-pointer ${
+                isActive ? 'text-emerald-400 bg-[#1B1F24]' : 'text-[#6F7680] hover:text-[#A0A6AE]'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -220,15 +227,75 @@ export const Navigation: React.FC = () => {
             </button>
           );
         })}
+
+        {/* Mobile "More" Button */}
+        <button
+          onClick={() => setIsMoreOpen(true)}
+          className={`flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors cursor-pointer ${
+            isMoreActive ? 'text-emerald-400 bg-[#1B1F24]' : 'text-[#6F7680] hover:text-[#A0A6AE]'
+          }`}
+        >
+          <MoreHorizontal className="w-4 h-4" />
+          <span className="text-[10px] mt-1">More</span>
+        </button>
+
         {/* Mobile logout */}
         <button
           onClick={logout}
-          className="flex flex-col items-center justify-center w-14 h-12 rounded-lg text-[#6F7680]"
+          className="flex flex-col items-center justify-center w-14 h-12 rounded-lg text-[#6F7680] hover:text-red-400 cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
           <span className="text-[10px] mt-1">Sign Out</span>
         </button>
       </nav>
+
+      {/* ── Mobile More Bottom Sheet / Modal ── */}
+      {isMoreOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMoreOpen(false)}
+          />
+
+          {/* Bottom Sheet */}
+          <div className="relative bg-[#15181D] border-t border-[#292D33] rounded-t-2xl p-5 shadow-2xl z-10 max-h-[80vh] overflow-y-auto space-y-4 animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-[#292D33]">
+              <h3 className="text-sm font-bold text-[#F5F5F5]">More Sections</h3>
+              <button
+                onClick={() => setIsMoreOpen(false)}
+                className="p-1.5 rounded-lg bg-[#1B1F24] text-[#A0A6AE] hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              {overflowNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPage === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setCurrentPage(item.id);
+                      setIsMoreOpen(false);
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-sm'
+                        : 'bg-[#1B1F24] border-[#292D33] text-[#A0A6AE] hover:text-white hover:border-[#3E444D]'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 mb-1.5 ${isActive ? 'text-emerald-400' : 'text-[#A0A6AE]'}`} />
+                    <span className="text-xs font-medium line-clamp-1">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

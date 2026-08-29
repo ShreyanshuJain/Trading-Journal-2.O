@@ -18,7 +18,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, isPreviewDomain } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const {
@@ -50,10 +50,17 @@ export const LoginPage: React.FC = () => {
   const [copiedHost, setCopiedHost] = useState(false);
   const [copiedWildcard, setCopiedWildcard] = useState(false);
   const [currentHostname, setCurrentHostname] = useState('');
+  const [proactiveNotice, setProactiveNotice] = useState(false);
+  const [dismissedNotice, setDismissedNotice] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setCurrentHostname(window.location.hostname);
+      const host = window.location.hostname;
+      setCurrentHostname(host);
+      // Proactively check if on an AI Studio preview domain or untrusted domain
+      if (isPreviewDomain(host)) {
+        setProactiveNotice(true);
+      }
     }
   }, []);
 
@@ -72,6 +79,7 @@ export const LoginPage: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    setDismissedNotice(false);
     await signInWithGoogle();
     setGoogleLoading(false);
   };
@@ -97,10 +105,13 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const isUnauthorizedDomain =
+  const isAuthErrorUnauthorized =
     authErrorCode === 'auth/unauthorized-domain' ||
     authError?.toLowerCase().includes('authorized domain') ||
     authError?.toLowerCase().includes('not authorized');
+
+  const isUnauthorizedDomain =
+    (!dismissedNotice && proactiveNotice) || isAuthErrorUnauthorized;
 
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'trading-journal-f8d1a';
   const firebaseSettingsUrl = `https://console.firebase.google.com/project/${projectId}/authentication/settings`;
@@ -188,7 +199,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Error Message */}
-          {authError && !isUnauthorizedDomain && (
+          {authError && !isAuthErrorUnauthorized && (
             <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <div className="flex-1">{authError}</div>
@@ -232,7 +243,10 @@ export const LoginPage: React.FC = () => {
                 </a>
                 <button
                   type="button"
-                  onClick={clearAuthError}
+                  onClick={() => {
+                    setDismissedNotice(true);
+                    clearAuthError();
+                  }}
                   className="px-2.5 py-1.5 border border-[#292D33] text-[#A0A6AE] hover:text-[#F5F5F5] rounded-lg text-[11px] cursor-pointer"
                 >
                   Dismiss

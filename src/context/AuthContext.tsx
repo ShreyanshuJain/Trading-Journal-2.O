@@ -13,6 +13,26 @@ import {
 import { auth, db } from '../firebase/config';
 import { doc, setDoc } from '../firebase/realtime';
 
+export const isKnownAuthorizedDomain = (hostname: string): boolean => {
+  if (!hostname) return false;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  if (hostname.endsWith('.firebaseapp.com') || hostname.endsWith('.web.app')) return true;
+  return false;
+};
+
+export const isPreviewDomain = (hostname: string): boolean => {
+  if (!hostname) return false;
+  if (
+    hostname.includes('ai.studio') ||
+    hostname.includes('run.app') ||
+    hostname.includes('webcontainer') ||
+    hostname.includes('google.internal')
+  ) {
+    return true;
+  }
+  return !isKnownAuthorizedDomain(hostname);
+};
+
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;

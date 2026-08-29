@@ -59,7 +59,7 @@ export const SettingsView: React.FC = () => {
 
   // Risk Rules State
   const [maxDailyLoss, setMaxDailyLoss] = useState<number>(settings.maxDailyLossPercent);
-  const [maxPositionRisk, setMaxPositionRisk] = useState<number>(settings.maxPositionRiskPercent);
+  const [maxPositionRisk, setMaxPositionRisk] = useState<number>(settings.maxRiskPercent);
   const [maxDrawdown, setMaxDrawdown] = useState<number>(settings.maxDrawdownPercent);
   const [maxConsecutiveLosses, setMaxConsecutiveLosses] = useState<number>(settings.maxConsecutiveLosses);
 
@@ -91,7 +91,7 @@ export const SettingsView: React.FC = () => {
   const handleSaveRiskSettings = () => {
     updateSettings({
       maxDailyLossPercent: maxDailyLoss,
-      maxPositionRiskPercent: maxPositionRisk,
+      maxRiskPercent: maxPositionRisk,
       maxDrawdownPercent: maxDrawdown,
       maxConsecutiveLosses,
     });
