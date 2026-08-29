@@ -26,7 +26,6 @@ export const LoginPage: React.FC = () => {
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
-    signInWithUid,
     authError,
     authErrorCode,
     clearAuthError,
@@ -47,9 +46,7 @@ export const LoginPage: React.FC = () => {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  // Custom UID & Domain
-  const [showCustomUidInput, setShowCustomUidInput] = useState(false);
-  const [customUid, setCustomUid] = useState('e0xW3T8S83Y8ATyma1keIe0fNX03');
+  // Domain authorization helpers
   const [copiedHost, setCopiedHost] = useState(false);
   const [copiedWildcard, setCopiedWildcard] = useState(false);
   const [currentHostname, setCurrentHostname] = useState('');
@@ -89,13 +86,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleUidSignIn = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customUid.trim()) {
-      signInWithUid(customUid.trim(), 'Shreyanshu Jain', 'gulshreyanshu72@gmail.com');
-    }
-  };
-
   const copyToClipboard = (text: string, isWildcard: boolean) => {
     navigator.clipboard.writeText(text);
     if (isWildcard) {
@@ -128,21 +118,25 @@ export const LoginPage: React.FC = () => {
         <div className="text-center mb-6 flex flex-col items-center">
           <div className="relative group">
             {/* Ambient glow */}
-            <div className="absolute -inset-2 bg-gradient-to-tr from-emerald-500/30 via-amber-500/20 to-blue-500/30 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition duration-500" />
+            <div className="absolute -inset-2 bg-gradient-to-tr from-emerald-500/40 via-amber-500/30 to-blue-500/40 rounded-full blur-xl opacity-80 group-hover:opacity-100 transition duration-500" />
             
             {/* Circular Logo Container */}
-            <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-emerald-500/40 shadow-2xl bg-[#0D0F12] flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+            <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-emerald-500/60 shadow-2xl bg-[#0D0F12] flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <img
-                src="/logo.png"
+                src="/logo_circular.png"
                 alt="The Trading Journal"
-                className="w-full h-full object-cover object-[50%_25%] scale-[1.35] block"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover block"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
               />
             </div>
           </div>
           <h1 className="text-lg font-extrabold tracking-wider text-[#F5F5F5] uppercase mt-3">
             The Trading Journal
           </h1>
-          <p className="text-xs font-medium tracking-widest text-emerald-400 mt-0.5 uppercase">
+          <p className="text-xs font-semibold tracking-widest text-emerald-400 mt-0.5 uppercase">
             Track • Analyze • Grow
           </p>
         </div>
@@ -368,58 +362,6 @@ export const LoginPage: React.FC = () => {
             )}
             <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
           </button>
-
-          {/* Instant Terminal Entry / Bypass */}
-          <div className="mt-4 pt-3 border-t border-[#292D33]/60">
-            <button
-              type="button"
-              onClick={() => signInWithUid('e0xW3T8S83Y8ATyma1keIe0fNX03', 'Shreyanshu Jain', 'gulshreyanshu72@gmail.com')}
-              className="w-full py-2 px-3 rounded-xl bg-[#1B1F24] hover:bg-[#22272E] border border-[#292D33] text-[#A0A6AE] hover:text-[#F5F5F5] text-xs transition flex items-center justify-between cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Instant Terminal Access (Default User)</span>
-              </div>
-              <span className="font-mono text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">e0xW3...</span>
-            </button>
-
-            <div className="mt-2 text-center">
-              {!showCustomUidInput ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCustomUidInput(true)}
-                  className="text-[11px] text-[#6F7680] hover:text-[#A0A6AE] underline cursor-pointer"
-                >
-                  Enter custom UID
-                </button>
-              ) : (
-                <form onSubmit={handleUidSignIn} className="space-y-2 mt-2 bg-[#0D0F12] p-2.5 rounded-xl border border-[#292D33]">
-                  <input
-                    type="text"
-                    value={customUid}
-                    onChange={(e) => setCustomUid(e.target.value)}
-                    placeholder="Custom Firebase UID"
-                    className="w-full px-2.5 py-1.5 text-xs bg-[#15181D] border border-[#292D33] rounded-lg text-[#F5F5F5] font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="flex-1 py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-medium cursor-pointer"
-                    >
-                      Enter UID
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomUidInput(false)}
-                      className="py-1 px-2 border border-[#292D33] text-[#6F7680] hover:text-[#F5F5F5] text-[11px] cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Feature highlights footer */}

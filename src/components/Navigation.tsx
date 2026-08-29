@@ -56,14 +56,18 @@ export const Navigation: React.FC = () => {
             title="The Trading Journal Dashboard"
           >
             {/* Ambient glow */}
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-emerald-500/30 via-amber-500/20 to-blue-500/30 blur-md opacity-60 group-hover:opacity-100 transition duration-300" />
+            <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-emerald-500/40 via-amber-500/30 to-blue-500/40 blur-md opacity-70 group-hover:opacity-100 transition duration-300" />
 
             {/* Circular Logo Frame */}
-            <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#292D33] group-hover:border-emerald-500/60 bg-[#0D0F12] shadow-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-emerald-500/50 group-hover:border-emerald-400 bg-[#0D0F12] shadow-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <img
-                src="/logo.png"
+                src="/logo_circular.png"
                 alt="The Trading Journal"
-                className="w-full h-full object-cover object-[50%_25%] scale-[1.35] block"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover block"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
               />
             </div>
           </div>
@@ -71,7 +75,7 @@ export const Navigation: React.FC = () => {
             <h2 className="text-xs font-bold tracking-wider text-[#F5F5F5] uppercase">
               The Trading Journal
             </h2>
-            <p className="text-[10px] font-medium tracking-widest text-emerald-400 mt-0.5 uppercase">
+            <p className="text-[10px] font-semibold tracking-widest text-emerald-400 mt-0.5 uppercase">
               Track • Analyze • Grow
             </p>
           </div>
@@ -157,11 +161,15 @@ export const Navigation: React.FC = () => {
       {/* ── Mobile Top Header ── */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-[#15181D] border-b border-[#292D33] px-3 flex items-center justify-between z-40">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-emerald-500/40 bg-[#0D0F12] shadow-sm flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-emerald-500/50 bg-[#0D0F12] shadow-sm flex items-center justify-center flex-shrink-0">
             <img
-              src="/logo.png"
+              src="/logo_circular.png"
               alt="The Trading Journal"
-              className="w-full h-full object-cover object-[50%_25%] scale-[1.35]"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover block"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/logo.png';
+              }}
             />
           </div>
           <span className="text-xs font-bold text-[#F5F5F5] tracking-wide">The Trading Journal</span>

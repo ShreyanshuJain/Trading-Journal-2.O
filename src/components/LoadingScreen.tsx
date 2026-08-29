@@ -7,11 +7,15 @@ export const LoadingScreen: React.FC = () => {
       {/* Sidebar skeleton */}
       <aside className="hidden lg:flex flex-col w-64 bg-[#15181D] border-r border-[#292D33] fixed left-0 top-0 bottom-0">
         <div className="py-4 px-3 border-b border-[#292D33] flex flex-col items-center justify-center text-center">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-[#292D33] bg-[#0D0F12] shadow-xl flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-emerald-500/50 bg-[#0D0F12] shadow-xl flex items-center justify-center">
             <img
-              src="/logo.png"
+              src="/logo_circular.png"
               alt="The Trading Journal"
-              className="w-full h-full object-cover object-[50%_25%] scale-[1.35] block"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover block"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/logo.png';
+              }}
             />
           </div>
           <div className="mt-2.5">
