@@ -56,7 +56,7 @@ const CUSTOM_UID_KEY = 'trading_journal_custom_uid';
 const LAST_AUTH_UID_KEY = 'trading_journal_auth_uid';
 const LOCAL_USER_EMAIL_KEY = 'trading_journal_user_email';
 const LOCAL_USER_NAME_KEY = 'trading_journal_user_name';
-const DEFAULT_USER_UID = 'e0xW3T8S83Y8ATyma1keIe0fNX03';
+const DEFAULT_USER_UID = 'Zi76NGGrt1aUNRRt3FSpI0ekB5h2';
 const DEFAULT_USER_EMAIL = 'gulshreyanshu72@gmail.com';
 const DEFAULT_USER_NAME = 'Shreyanshu Jain';
 
@@ -64,7 +64,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
       const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY);
-      const savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
+      let savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
+      if (savedCustomUid === 'e0xW3T8S83Y8ATyma1keIe0fNX03') {
+        savedCustomUid = DEFAULT_USER_UID;
+        localStorage.setItem(CUSTOM_UID_KEY, DEFAULT_USER_UID);
+        localStorage.setItem(LAST_AUTH_UID_KEY, DEFAULT_USER_UID);
+      }
       const savedEmail = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
       const savedName = localStorage.getItem(LOCAL_USER_NAME_KEY);
       if (savedCustomUid) {
@@ -105,7 +110,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setCurrentUser(user);
       } else {
         const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY);
-        const savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
+        let savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
+        if (savedCustomUid === 'e0xW3T8S83Y8ATyma1keIe0fNX03') {
+          savedCustomUid = DEFAULT_USER_UID;
+          localStorage.setItem(CUSTOM_UID_KEY, DEFAULT_USER_UID);
+          localStorage.setItem(LAST_AUTH_UID_KEY, DEFAULT_USER_UID);
+        }
         const savedEmail = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
         const savedName = localStorage.getItem(LOCAL_USER_NAME_KEY);
         if (savedCustomUid) {

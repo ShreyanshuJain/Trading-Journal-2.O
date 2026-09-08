@@ -212,7 +212,20 @@ export function onSnapshot(
           });
 
           if (snapshot.docs.length === 0) {
-            // Collection is genuinely empty on the server
+            // Check if local cache has items that should be preserved and synced to Firestore
+            const cached = getLocalValue(target.path);
+            const cachedEntries = cached && typeof cached === 'object' ? Object.entries(cached) : [];
+            if (cachedEntries.length > 0) {
+              // Upload any cached documents to Firestore so they are stored safely in cloud database
+              cachedEntries.forEach(([id, item]) => {
+                if (item && typeof item === 'object') {
+                  fsSetDoc(fsDoc(db, `${target.path}/${id}`), item as DocumentData, { merge: true }).catch(() => {});
+                }
+              });
+              callback(toCollectionSnapshot(cached, target.path));
+              return;
+            }
+
             setLocalValue(target.path, {});
             callback({ docs: [], empty: true });
             return;

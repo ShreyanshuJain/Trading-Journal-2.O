@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useJournal } from '../context/JournalContext';
 import { HeaderBar } from './HeaderBar';
-import { Wallet, Plus, Trash2, Edit2, DollarSign, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import { Wallet, Plus, Trash2, Edit2, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export const AccountsView: React.FC = () => {
-  const { accounts, addAccount, updateAccount, deleteAccount, trades, resetDemoData } = useJournal();
+  const { accounts, addAccount, updateAccount, deleteAccount, trades } = useJournal();
 
   const [name, setName] = useState('');
   const [broker, setBroker] = useState('');
@@ -114,22 +114,6 @@ export const AccountsView: React.FC = () => {
               })}
             </div>
           )}
-
-          <div className="p-4 bg-[#15181D] border border-[#292D33] rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <RefreshCw className="w-5 h-5 text-emerald-400" />
-              <div>
-                <h4 className="text-sm font-semibold text-[#F5F5F5]">Reset Demo Data</h4>
-                <p className="text-xs text-[#A0A6AE]">Restore clean pre-populated trades and accounts for demonstration</p>
-              </div>
-            </div>
-            <button
-              onClick={resetDemoData}
-              className="px-3 py-1.5 rounded-lg bg-[#1B1F24] hover:bg-[#22272E] border border-[#292D33] text-xs font-medium text-[#F5F5F5] cursor-pointer transition-all"
-            >
-              Reset Data
-            </button>
-          </div>
         </div>
 
         {/* Create Account Form */}

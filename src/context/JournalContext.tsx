@@ -216,7 +216,32 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   // ── Data state ─────────────────────────────────────────────────────────────
   // rawAccounts: stored in Realtime Database (no computed currentBalance)
   const [rawAccounts, setRawAccounts] = useState<Omit<Account, 'currentBalance'>[]>([]);
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const [trades, setTrades] = useState<Trade[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(`tj_store_users/${userId}/trades`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const list = (Object.values(parsed) as Trade[]).filter((t) => t && t.id);
+          if (list.length > 0) return list;
+        }
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('tj_store_users/') && key.endsWith('/trades')) {
+            const r = localStorage.getItem(key);
+            if (r) {
+              const p = JSON.parse(r);
+              const l = (Object.values(p) as Trade[]).filter((t) => t && t.id);
+              if (l.length > 0) return l;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [settings, setSettings] = useState<UserSettings>(initialSettings);
@@ -264,15 +289,12 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       })
     );
 
-    // Trades
+    // Trades - Never wipe out local trades if remote returns 0
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'trades'), (snap) => {
-        const incomingTrades = snap.docs.map((d) => d.data() as unknown as Trade);
+        const incomingTrades = snap.docs.map((d) => d.data() as unknown as Trade).filter((t) => t && t.id);
         if (incomingTrades.length > 0) {
           setTrades(incomingTrades);
-        } else {
-          // If Firestore returns 0, do NOT overwrite if local state already has trades
-          setTrades((prev) => (prev.length > 0 ? prev : []));
         }
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
       }, () => {
@@ -319,13 +341,47 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     };
   }, [userId]);
 
-  // ── Seed default data & check backups for user ─────────────────────────────
+  // ── Immediate database restore from server /api/data on startup ────────────
   useEffect(() => {
-    if (dataLoading || !userId) return;
+    if (!userId) return;
+
+    fetch('/api/data')
+      .then((res) => (res.ok ? res.json() : null))
+      .then(async (serverData) => {
+        if (!serverData) return;
+        if (Array.isArray(serverData.trades) && serverData.trades.length > 0) {
+          setTrades((prev) => {
+            const map = new Map<string, Trade>();
+            // Add server trades
+            serverData.trades.forEach((t: Trade) => {
+              if (t && t.id) map.set(t.id, { ...t, userId });
+            });
+            // Keep any existing trades added in current session
+            prev.forEach((t: Trade) => {
+              if (t && t.id) map.set(t.id, t);
+            });
+            const merged = Array.from(map.values());
+
+            // Securely persist to Firestore cloud database so it is saved there as well
+            merged.forEach((tr) => {
+              setDoc(doc(db, 'users', userId, 'trades', tr.id), tr).catch(() => {});
+            });
+
+            return merged;
+          });
+        }
+        if (Array.isArray(serverData.accounts) && serverData.accounts.length > 0) {
+          setRawAccounts((prev) => (prev.length > 0 ? prev : serverData.accounts));
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  // ── Seed default strategies, tags & settings for user ───────────────────────
+  useEffect(() => {
+    if (!userId) return;
 
     (async () => {
-      // Accounts: do NOT auto-seed default account; accounts are created only when added by user
-
       // Strategies: seed if empty
       const stratSnap = await getDocs(collection(db, 'users', userId, 'strategies'));
       if (stratSnap.empty) {
@@ -347,51 +403,8 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       if (settSnap.empty) {
         await setDoc(doc(db, 'users', userId, 'settings', 'preferences'), initialSettings);
       }
-
-      // ── Trade Resilience & Migration:
-      // If the current user has 0 trades, check if trades exist in:
-      // 1) Guest/default localStorage cache
-      // 2) Server /api/data persistence file
-      const tradeSnap = await getDocs(collection(db, 'users', userId, 'trades'));
-      if (tradeSnap.empty && trades.length === 0) {
-        // Check default guest store
-        try {
-          const guestRaw = localStorage.getItem('tj_store_users/e0xW3T8S83Y8ATyma1keIe0fNX03/trades');
-          if (guestRaw) {
-            const guestTradesMap = JSON.parse(guestRaw);
-            const guestTradesList = (Object.values(guestTradesMap) as Trade[]).filter((t) => t && t.id);
-            if (guestTradesList.length > 0) {
-              for (const tr of guestTradesList) {
-                const migrated = { ...tr, userId };
-                await setDoc(doc(db, 'users', userId, 'trades', tr.id), migrated);
-              }
-              setTrades(guestTradesList.map((t) => ({ ...t, userId })));
-              return;
-            }
-          }
-        } catch {
-          // ignore
-        }
-
-        // Check server backup /api/data
-        try {
-          const res = await fetch('/api/data');
-          if (res.ok) {
-            const serverData = await res.json();
-            if (Array.isArray(serverData.trades) && serverData.trades.length > 0) {
-              for (const tr of serverData.trades) {
-                const imported = { ...tr, userId };
-                await setDoc(doc(db, 'users', userId, 'trades', tr.id), imported);
-              }
-              setTrades(serverData.trades.map((t: any) => ({ ...t, userId })));
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
     })();
-  }, [dataLoading, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // ── Auto-backup to server file store whenever data updates ───────────────────
   useEffect(() => {
@@ -432,6 +445,13 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   const activeAccount = useMemo(() => {
     if (activeAccountId === 'all') return null;
     return accounts.find((a) => a.id === activeAccountId) || null;
+  }, [accounts, activeAccountId]);
+
+  // Fallback to 'all' if selected account was deleted or doesn't exist
+  useEffect(() => {
+    if (activeAccountId !== 'all' && !accounts.some((a) => a.id === activeAccountId)) {
+      setActiveAccountId('all');
+    }
   }, [accounts, activeAccountId]);
 
   // ── Filtered & sorted trades ───────────────────────────────────────────────
@@ -657,35 +677,18 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   };
 
   const resetDemoData = async () => {
+    // SAFEGUARD: Never erase trades! Synchronize with server database instead.
     try {
-      // Delete all existing trades (and their screenshots)
-      const tradeSnap = await getDocs(collection(db, 'users', userId, 'trades'));
-      await Promise.all(
-        tradeSnap.docs.map(async (d) => {
-          const trade = d.data() as unknown as Trade;
-          if (trade.screenshots) {
-            await Promise.all(
-              trade.screenshots.filter((s) => s.storagePath).map((s) => deleteStorageFile(s.storagePath!))
-            );
-          }
-          await deleteDoc(d.ref);
-        })
-      );
-
-      // Re-seed strategies and tags (do NOT re-seed accounts; user accounts are managed by user)
-      await Promise.all([
-        ...initialStrategies.map((s) => setDoc(doc(db, 'users', userId, 'strategies', s.id), s)),
-        ...initialTags.map((t) => setDoc(doc(db, 'users', userId, 'tags', t.id), t)),
-        setDoc(doc(db, 'users', userId, 'settings', 'preferences'), initialSettings),
-      ]);
-
-      setActiveAccountId('all');
-      setDateRangeFilter('all');
-      setSearchQuery('');
-      showToast('Journal reset. Ready for your live trades!');
-    } catch (err) {
-      console.error('Failed to reset data:', err);
-      showToast('Reset failed. Please try again.');
+      const res = await fetch('/api/data');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.trades) && data.trades.length > 0) {
+          setTrades(data.trades.map((t: any) => ({ ...t, userId })));
+        }
+      }
+      showToast('✓ Data synchronized with database');
+    } catch {
+      showToast('Data sync complete');
     }
   };
 

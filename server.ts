@@ -334,38 +334,57 @@ app.post('/api/data/sync', async (req, res) => {
   try {
     const { trades, accounts, strategies, tags, settings } = req.body;
 
+    const existing = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null };
+
+    // SAFEGUARD: Never wipe out existing trades if incoming payload is empty
+    const safeTrades = (Array.isArray(trades) && trades.length > 0)
+      ? trades
+      : (Array.isArray(existing.trades) && existing.trades.length > 0 ? existing.trades : (trades || []));
+
+    const safeStrategies = (Array.isArray(strategies) && strategies.length > 0)
+      ? strategies
+      : (Array.isArray(existing.strategies) && existing.strategies.length > 0 ? existing.strategies : []);
+
+    const safeTags = (Array.isArray(tags) && tags.length > 0)
+      ? tags
+      : (Array.isArray(existing.tags) && existing.tags.length > 0 ? existing.tags : []);
+
+    const safeAccounts = Array.isArray(accounts) ? accounts : (existing.accounts || []);
+    const safeSettings = settings || existing.settings;
+
     // Always persist to local file store as indestructible baseline backup
-    saveLocalData({ trades, accounts, strategies, tags, settings, updatedAt: new Date().toISOString() });
+    saveLocalData({
+      trades: safeTrades,
+      accounts: safeAccounts,
+      strategies: safeStrategies,
+      tags: safeTags,
+      settings: safeSettings,
+      updatedAt: new Date().toISOString(),
+    });
 
     if (db) {
-      if (Array.isArray(trades)) {
+      if (Array.isArray(safeTrades) && safeTrades.length > 0) {
         await db.collection('trades').deleteMany({});
-        if (trades.length > 0) {
-          await db.collection('trades').insertMany(trades.map((t) => ({ ...t, _id: t.id })));
-        }
+        await db.collection('trades').insertMany(safeTrades.map((t) => ({ ...t, _id: t.id })));
       }
-      if (Array.isArray(accounts)) {
+      if (Array.isArray(safeAccounts)) {
         await db.collection('accounts').deleteMany({});
-        if (accounts.length > 0) {
-          await db.collection('accounts').insertMany(accounts.map((a) => ({ ...a, _id: a.id })));
+        if (safeAccounts.length > 0) {
+          await db.collection('accounts').insertMany(safeAccounts.map((a) => ({ ...a, _id: a.id })));
         }
       }
-      if (Array.isArray(strategies)) {
+      if (Array.isArray(safeStrategies) && safeStrategies.length > 0) {
         await db.collection('strategies').deleteMany({});
-        if (strategies.length > 0) {
-          await db.collection('strategies').insertMany(strategies.map((s) => ({ ...s, _id: s.id })));
-        }
+        await db.collection('strategies').insertMany(safeStrategies.map((s) => ({ ...s, _id: s.id })));
       }
-      if (Array.isArray(tags)) {
+      if (Array.isArray(safeTags) && safeTags.length > 0) {
         await db.collection('tags').deleteMany({});
-        if (tags.length > 0) {
-          await db.collection('tags').insertMany(tags.map((tg) => ({ ...tg, _id: tg.id })));
-        }
+        await db.collection('tags').insertMany(safeTags.map((tg) => ({ ...tg, _id: tg.id })));
       }
-      if (settings) {
+      if (safeSettings) {
         await db
           .collection('settings')
-          .updateOne({ _id: 'user_settings' as any }, { $set: settings }, { upsert: true });
+          .updateOne({ _id: 'user_settings' as any }, { $set: safeSettings }, { upsert: true });
       }
       return res.json({ success: true, storage: 'MongoDB + Local File Backup' });
     }
