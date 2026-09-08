@@ -215,26 +215,29 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
 
   // ── Data state ─────────────────────────────────────────────────────────────
   // rawAccounts: stored in Realtime Database (no computed currentBalance)
-  const [rawAccounts, setRawAccounts] = useState<Omit<Account, 'currentBalance'>[]>([]);
+  const [rawAccounts, setRawAccounts] = useState<Omit<Account, 'currentBalance'>[]>(() => {
+    if (typeof window !== 'undefined' && userId) {
+      try {
+        const raw = localStorage.getItem(`tj_store_users/${userId}/accounts`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const list = (Object.values(parsed) as Account[]).filter((a) => a && a.id && (!a.userId || a.userId === userId));
+          if (list.length > 0) return list;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
   const [trades, setTrades] = useState<Trade[]>(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && userId) {
       try {
         const raw = localStorage.getItem(`tj_store_users/${userId}/trades`);
         if (raw) {
           const parsed = JSON.parse(raw);
-          const list = (Object.values(parsed) as Trade[]).filter((t) => t && t.id);
+          const list = (Object.values(parsed) as Trade[]).filter((t) => t && t.id && t.userId === userId);
           if (list.length > 0) return list;
-        }
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('tj_store_users/') && key.endsWith('/trades')) {
-            const r = localStorage.getItem(key);
-            if (r) {
-              const p = JSON.parse(r);
-              const l = (Object.values(p) as Trade[]).filter((t) => t && t.id);
-              if (l.length > 0) return l;
-            }
-          }
         }
       } catch {
         // ignore
@@ -282,20 +285,23 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     // Accounts
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'accounts'), (snap) => {
-        setRawAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Omit<Account, 'currentBalance'>));
+        const incomingAccounts = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }) as Omit<Account, 'currentBalance'>)
+          .filter((a) => a && a.id && (!a.userId || a.userId === userId));
+        setRawAccounts(incomingAccounts);
         if (!loaded.accounts) { loaded.accounts = true; checkDone(); }
       }, () => {
         if (!loaded.accounts) { loaded.accounts = true; checkDone(); }
       })
     );
 
-    // Trades - Never wipe out local trades if remote returns 0
+    // Trades
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'trades'), (snap) => {
-        const incomingTrades = snap.docs.map((d) => d.data() as unknown as Trade).filter((t) => t && t.id);
-        if (incomingTrades.length > 0) {
-          setTrades(incomingTrades);
-        }
+        const incomingTrades = snap.docs
+          .map((d) => d.data() as unknown as Trade)
+          .filter((t) => t && t.id && (!t.userId || t.userId === userId));
+        setTrades(incomingTrades);
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
       }, () => {
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
@@ -345,48 +351,61 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   useEffect(() => {
     if (!userId) return;
 
-    fetch('/api/data')
+    fetch(`/api/data?userId=${encodeURIComponent(userId)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then(async (serverData) => {
         if (!serverData) return;
-        if (Array.isArray(serverData.trades) && serverData.trades.length > 0) {
-          setTrades((prev) => {
-            const map = new Map<string, Trade>();
-            // Add server trades
-            serverData.trades.forEach((t: Trade) => {
-              if (t && t.id) map.set(t.id, { ...t, userId });
+        if (Array.isArray(serverData.trades)) {
+          // Strictly only accept trades belonging to this authenticated user
+          const userOnlyTrades = serverData.trades.filter((t: Trade) => t && t.id && t.userId === userId);
+          if (userOnlyTrades.length > 0) {
+            setTrades((prev) => {
+              const map = new Map<string, Trade>();
+              userOnlyTrades.forEach((t: Trade) => map.set(t.id, t));
+              prev.forEach((t: Trade) => {
+                if (t && t.id && (!t.userId || t.userId === userId)) map.set(t.id, t);
+              });
+              return Array.from(map.values());
             });
-            // Keep any existing trades added in current session
-            prev.forEach((t: Trade) => {
-              if (t && t.id) map.set(t.id, t);
-            });
-            const merged = Array.from(map.values());
-
-            // Securely persist to Firestore cloud database so it is saved there as well
-            merged.forEach((tr) => {
-              setDoc(doc(db, 'users', userId, 'trades', tr.id), tr).catch(() => {});
-            });
-
-            return merged;
-          });
+          }
         }
-        if (Array.isArray(serverData.accounts) && serverData.accounts.length > 0) {
-          setRawAccounts((prev) => (prev.length > 0 ? prev : serverData.accounts));
+        if (Array.isArray(serverData.accounts)) {
+          const userOnlyAccounts = serverData.accounts.filter((a: any) => a && a.id && (!a.userId || a.userId === userId));
+          if (userOnlyAccounts.length > 0) {
+            setRawAccounts((prev) => (prev.length > 0 ? prev : userOnlyAccounts));
+          }
         }
       })
       .catch(() => {});
   }, [userId]);
 
-  // ── Seed default strategies, tags & settings for user ───────────────────────
+  // ── Seed default account, strategies, tags & settings for new user ─────────
   useEffect(() => {
     if (!userId) return;
 
     (async () => {
+      // Accounts: seed default primary trading account if empty
+      const accSnap = await getDocs(collection(db, 'users', userId, 'accounts'));
+      if (accSnap.empty) {
+        const defaultAcc: Omit<Account, 'currentBalance'> = {
+          id: 'acc_main',
+          name: 'Primary Trading Account',
+          startingBalance: 10000,
+          currency: 'USD',
+          accountType: 'Live',
+          type: 'Live',
+          broker: 'MetaTrader 5',
+          description: 'Main trading account',
+          userId,
+        };
+        await setDoc(doc(db, 'users', userId, 'accounts', 'acc_main'), defaultAcc);
+      }
+
       // Strategies: seed if empty
       const stratSnap = await getDocs(collection(db, 'users', userId, 'strategies'));
       if (stratSnap.empty) {
         await Promise.all(
-          initialStrategies.map((s) => setDoc(doc(db, 'users', userId, 'strategies', s.id), s))
+          initialStrategies.map((s) => setDoc(doc(db, 'users', userId, 'strategies', s.id), { ...s, userId }))
         );
       }
 
@@ -394,28 +413,30 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       const tagSnap = await getDocs(collection(db, 'users', userId, 'tags'));
       if (tagSnap.empty) {
         await Promise.all(
-          initialTags.map((t) => setDoc(doc(db, 'users', userId, 'tags', t.id), t))
+          initialTags.map((t) => setDoc(doc(db, 'users', userId, 'tags', t.id), { ...t, userId }))
         );
       }
 
       // Settings: seed if doc doesn't exist
       const settSnap = await getDocs(collection(db, 'users', userId, 'settings'));
       if (settSnap.empty) {
-        await setDoc(doc(db, 'users', userId, 'settings', 'preferences'), initialSettings);
+        await setDoc(doc(db, 'users', userId, 'settings', 'preferences'), { ...initialSettings, defaultAccountId: 'acc_main' });
       }
     })();
   }, [userId]);
 
   // ── Auto-backup to server file store whenever data updates ───────────────────
   useEffect(() => {
+    if (!userId) return;
     if (trades.length === 0 && rawAccounts.length === 0) return;
     const timer = setTimeout(() => {
       fetch('/api/data/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          trades,
-          accounts: rawAccounts,
+          userId,
+          trades: trades.filter((t) => !t.userId || t.userId === userId).map((t) => ({ ...t, userId })),
+          accounts: rawAccounts.map((a) => ({ ...a, userId })),
           strategies,
           tags,
           settings,
@@ -423,7 +444,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       }).catch(() => {});
     }, 1500);
     return () => clearTimeout(timer);
-  }, [trades, rawAccounts, strategies, tags, settings]);
+  }, [userId, trades, rawAccounts, strategies, tags, settings]);
 
   // ── Computed accounts (with currentBalance derived from trades) ─────────────
   const accounts: Account[] = useMemo(() => {
@@ -677,13 +698,13 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   };
 
   const resetDemoData = async () => {
-    // SAFEGUARD: Never erase trades! Synchronize with server database instead.
+    // SAFEGUARD: Only synchronize current authenticated user's trades
     try {
-      const res = await fetch('/api/data');
+      const res = await fetch(`/api/data?userId=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.trades) && data.trades.length > 0) {
-          setTrades(data.trades.map((t: any) => ({ ...t, userId })));
+        if (Array.isArray(data.trades)) {
+          setTrades(data.trades.filter((t: any) => t && t.id && t.userId === userId));
         }
       }
       showToast('✓ Data synchronized with database');
@@ -699,6 +720,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     const newAcc: Omit<Account, 'currentBalance'> = {
       ...acc,
       id: newId,
+      userId,
       type: (acc as any).type || (acc as any).accountType || 'Live',
       accountType: (acc as any).accountType || (acc as any).type || 'Live',
     };
@@ -713,8 +735,9 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        trades,
-        accounts: updatedAccounts,
+        userId,
+        trades: trades.filter((t) => !t.userId || t.userId === userId).map((t) => ({ ...t, userId })),
+        accounts: updatedAccounts.map((a) => ({ ...a, userId })),
         strategies,
         tags,
         settings,
@@ -730,7 +753,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   const updateAccount = (id: string, fields: Partial<Omit<Account, 'currentBalance'>>) => {
     const existing = rawAccounts.find((a) => a.id === id);
     if (!existing) return;
-    const updated = { ...existing, ...fields };
+    const updated = { ...existing, ...fields, userId };
 
     // 1. Immediate optimistic UI update
     setRawAccounts((prev) => prev.map((a) => (a.id === id ? updated : a)));
@@ -742,8 +765,9 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        trades,
-        accounts: updatedAccounts,
+        userId,
+        trades: trades.filter((t) => !t.userId || t.userId === userId).map((t) => ({ ...t, userId })),
+        accounts: updatedAccounts.map((a) => ({ ...a, userId })),
         strategies,
         tags,
         settings,
@@ -788,8 +812,9 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        trades,
-        accounts: remainingAccounts,
+        userId,
+        trades: trades.filter((t) => !t.userId || t.userId === userId).map((t) => ({ ...t, userId })),
+        accounts: remainingAccounts.map((a) => ({ ...a, userId })),
         strategies,
         tags,
         settings,

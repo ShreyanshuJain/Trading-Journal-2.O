@@ -302,15 +302,21 @@ app.post('/api/upload/cloudinary', async (req, res) => {
   }
 });
 
-// GET all journal data (trades, accounts, strategies, tags, settings)
+// GET journal data (scoped by userId)
 app.get('/api/data', async (req, res) => {
   try {
+    const userId = req.query.userId as string | undefined;
+
     if (db) {
-      const trades = await db.collection('trades').find({}).toArray();
-      const accounts = await db.collection('accounts').find({}).toArray();
-      const strategies = await db.collection('strategies').find({}).toArray();
-      const tags = await db.collection('tags').find({}).toArray();
-      const settingsDoc = await db.collection('settings').findOne({ _id: 'user_settings' as any });
+      if (!userId) {
+        return res.json({ trades: [], accounts: [], strategies: [], tags: [], settings: null });
+      }
+
+      const trades = await db.collection('trades').find({ userId }).toArray();
+      const accounts = await db.collection('accounts').find({ $or: [{ userId }, { userId: { $exists: false } }] }).toArray();
+      const strategies = await db.collection('strategies').find({ $or: [{ userId }, { userId: { $exists: false } }] }).toArray();
+      const tags = await db.collection('tags').find({ $or: [{ userId }, { userId: { $exists: false } }] }).toArray();
+      const settingsDoc = await db.collection('settings').findOne({ _id: userId as any }) || await db.collection('settings').findOne({ _id: 'user_settings' as any });
 
       return res.json({
         trades: trades.map(({ _id, ...t }) => t),
@@ -321,36 +327,81 @@ app.get('/api/data', async (req, res) => {
       });
     }
 
-    const localData = readLocalData();
-    res.json(localData || {});
+    const localData = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null, userSettings: {} };
+
+    if (userId) {
+      const userTrades = (Array.isArray(localData.trades) ? localData.trades : []).filter((t: any) => t.userId === userId);
+      const userAccounts = (Array.isArray(localData.accounts) ? localData.accounts : []).filter((a: any) => !a.userId || a.userId === userId);
+      const userStrategies = (Array.isArray(localData.strategies) ? localData.strategies : []).filter((s: any) => !s.userId || s.userId === userId);
+      const userTags = (Array.isArray(localData.tags) ? localData.tags : []).filter((tg: any) => !tg.userId || tg.userId === userId);
+      const userSettings = (localData.userSettings && localData.userSettings[userId]) || localData.settings || null;
+
+      return res.json({
+        trades: userTrades,
+        accounts: userAccounts,
+        strategies: userStrategies,
+        tags: userTags,
+        settings: userSettings,
+      });
+    }
+
+    // If no userId is supplied, return empty trades so no user's private data is leaked
+    res.json({
+      trades: [],
+      accounts: [],
+      strategies: localData.strategies || [],
+      tags: localData.tags || [],
+      settings: null,
+    });
   } catch (err) {
     console.error('API /api/data error:', err);
     res.status(500).json({ error: 'Failed to fetch journal data' });
   }
 });
 
-// SAVE all journal data (bulk sync)
+// SAVE journal data (bulk sync scoped by userId)
 app.post('/api/data/sync', async (req, res) => {
   try {
-    const { trades, accounts, strategies, tags, settings } = req.body;
+    const { userId, trades, accounts, strategies, tags, settings } = req.body;
 
-    const existing = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null };
+    const existing = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null, userSettings: {} };
 
-    // SAFEGUARD: Never wipe out existing trades if incoming payload is empty
-    const safeTrades = (Array.isArray(trades) && trades.length > 0)
-      ? trades
-      : (Array.isArray(existing.trades) && existing.trades.length > 0 ? existing.trades : (trades || []));
+    let safeTrades = existing.trades || [];
+    let safeAccounts = existing.accounts || [];
+    let safeStrategies = existing.strategies || [];
+    let safeTags = existing.tags || [];
 
-    const safeStrategies = (Array.isArray(strategies) && strategies.length > 0)
-      ? strategies
-      : (Array.isArray(existing.strategies) && existing.strategies.length > 0 ? existing.strategies : []);
+    if (userId) {
+      // Isolate trades: retain trades of other users and replace/append trades of this user
+      const otherTrades = safeTrades.filter((t: any) => t.userId && t.userId !== userId);
+      const userTrades = (Array.isArray(trades) ? trades : []).map((t: any) => ({ ...t, userId }));
+      safeTrades = [...otherTrades, ...userTrades];
 
-    const safeTags = (Array.isArray(tags) && tags.length > 0)
-      ? tags
-      : (Array.isArray(existing.tags) && existing.tags.length > 0 ? existing.tags : []);
+      // Isolate accounts
+      const otherAccounts = safeAccounts.filter((a: any) => a.userId && a.userId !== userId);
+      const userAccounts = (Array.isArray(accounts) ? accounts : []).map((a: any) => ({ ...a, userId }));
+      safeAccounts = [...otherAccounts, ...userAccounts];
 
-    const safeAccounts = Array.isArray(accounts) ? accounts : (existing.accounts || []);
-    const safeSettings = settings || existing.settings;
+      if (Array.isArray(strategies) && strategies.length > 0) {
+        const otherStrats = safeStrategies.filter((s: any) => s.userId && s.userId !== userId);
+        safeStrategies = [...otherStrats, ...strategies.map((s: any) => ({ ...s, userId }))];
+      }
+
+      if (Array.isArray(tags) && tags.length > 0) {
+        const otherTags = safeTags.filter((tg: any) => tg.userId && tg.userId !== userId);
+        safeTags = [...otherTags, ...tags.map((tg: any) => ({ ...tg, userId }))];
+      }
+
+      existing.userSettings = existing.userSettings || {};
+      if (settings) {
+        existing.userSettings[userId] = settings;
+      }
+    } else {
+      if (Array.isArray(trades)) safeTrades = trades;
+      if (Array.isArray(accounts)) safeAccounts = accounts;
+      if (Array.isArray(strategies)) safeStrategies = strategies;
+      if (Array.isArray(tags)) safeTags = tags;
+    }
 
     // Always persist to local file store as indestructible baseline backup
     saveLocalData({
@@ -358,33 +409,24 @@ app.post('/api/data/sync', async (req, res) => {
       accounts: safeAccounts,
       strategies: safeStrategies,
       tags: safeTags,
-      settings: safeSettings,
+      settings: settings || existing.settings,
+      userSettings: existing.userSettings || {},
       updatedAt: new Date().toISOString(),
     });
 
-    if (db) {
-      if (Array.isArray(safeTrades) && safeTrades.length > 0) {
-        await db.collection('trades').deleteMany({});
-        await db.collection('trades').insertMany(safeTrades.map((t) => ({ ...t, _id: t.id })));
+    if (db && userId) {
+      await db.collection('trades').deleteMany({ userId });
+      const userTrades = (Array.isArray(trades) ? trades : []).map((t: any) => ({ ...t, _id: t.id, userId }));
+      if (userTrades.length > 0) {
+        await db.collection('trades').insertMany(userTrades);
       }
-      if (Array.isArray(safeAccounts)) {
-        await db.collection('accounts').deleteMany({});
-        if (safeAccounts.length > 0) {
-          await db.collection('accounts').insertMany(safeAccounts.map((a) => ({ ...a, _id: a.id })));
-        }
+      await db.collection('accounts').deleteMany({ userId });
+      const userAccounts = (Array.isArray(accounts) ? accounts : []).map((a: any) => ({ ...a, _id: a.id, userId }));
+      if (userAccounts.length > 0) {
+        await db.collection('accounts').insertMany(userAccounts);
       }
-      if (Array.isArray(safeStrategies) && safeStrategies.length > 0) {
-        await db.collection('strategies').deleteMany({});
-        await db.collection('strategies').insertMany(safeStrategies.map((s) => ({ ...s, _id: s.id })));
-      }
-      if (Array.isArray(safeTags) && safeTags.length > 0) {
-        await db.collection('tags').deleteMany({});
-        await db.collection('tags').insertMany(safeTags.map((tg) => ({ ...tg, _id: tg.id })));
-      }
-      if (safeSettings) {
-        await db
-          .collection('settings')
-          .updateOne({ _id: 'user_settings' as any }, { $set: safeSettings }, { upsert: true });
+      if (settings) {
+        await db.collection('settings').updateOne({ _id: userId as any }, { $set: settings }, { upsert: true });
       }
       return res.json({ success: true, storage: 'MongoDB + Local File Backup' });
     }

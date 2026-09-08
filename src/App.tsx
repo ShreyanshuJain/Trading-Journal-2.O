@@ -119,7 +119,7 @@ const Root: React.FC = () => {
   if (!isAuthenticated || !currentUser) return <LoginPage />;
 
   return (
-    <JournalProvider userId={currentUser.uid}>
+    <JournalProvider key={currentUser.uid} userId={currentUser.uid}>
       <AppShell />
     </JournalProvider>
   );

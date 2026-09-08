@@ -56,35 +56,18 @@ const CUSTOM_UID_KEY = 'trading_journal_custom_uid';
 const LAST_AUTH_UID_KEY = 'trading_journal_auth_uid';
 const LOCAL_USER_EMAIL_KEY = 'trading_journal_user_email';
 const LOCAL_USER_NAME_KEY = 'trading_journal_user_name';
-const DEFAULT_USER_UID = 'Zi76NGGrt1aUNRRt3FSpI0ekB5h2';
-const DEFAULT_USER_EMAIL = 'gulshreyanshu72@gmail.com';
-const DEFAULT_USER_NAME = 'Shreyanshu Jain';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
-      const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY);
-      let savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
-      if (savedCustomUid === 'e0xW3T8S83Y8ATyma1keIe0fNX03') {
-        savedCustomUid = DEFAULT_USER_UID;
-        localStorage.setItem(CUSTOM_UID_KEY, DEFAULT_USER_UID);
-        localStorage.setItem(LAST_AUTH_UID_KEY, DEFAULT_USER_UID);
-      }
+      const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY) || localStorage.getItem(CUSTOM_UID_KEY);
       const savedEmail = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
       const savedName = localStorage.getItem(LOCAL_USER_NAME_KEY);
-      if (savedCustomUid) {
+      if (savedAuthUid) {
         return {
-          uid: savedCustomUid,
-          displayName: savedName || (savedCustomUid === DEFAULT_USER_UID ? DEFAULT_USER_NAME : 'Trader'),
-          email: savedEmail || (savedCustomUid === DEFAULT_USER_UID ? DEFAULT_USER_EMAIL : 'trader@journal.local'),
-          photoURL: null,
-        } as unknown as User;
-      }
-      if (localStorage.getItem(GUEST_KEY) === 'true') {
-        return {
-          uid: DEFAULT_USER_UID,
-          displayName: DEFAULT_USER_NAME,
-          email: DEFAULT_USER_EMAIL,
+          uid: savedAuthUid,
+          displayName: savedName || 'Trader',
+          email: savedEmail || 'trader@journal.local',
           photoURL: null,
         } as unknown as User;
       }
@@ -104,32 +87,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         localStorage.removeItem(GUEST_KEY);
+        localStorage.removeItem(CUSTOM_UID_KEY);
         localStorage.setItem(LAST_AUTH_UID_KEY, user.uid);
         if (user.email) localStorage.setItem(LOCAL_USER_EMAIL_KEY, user.email);
         if (user.displayName) localStorage.setItem(LOCAL_USER_NAME_KEY, user.displayName);
         setCurrentUser(user);
       } else {
-        const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY);
-        let savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
-        if (savedCustomUid === 'e0xW3T8S83Y8ATyma1keIe0fNX03') {
-          savedCustomUid = DEFAULT_USER_UID;
-          localStorage.setItem(CUSTOM_UID_KEY, DEFAULT_USER_UID);
-          localStorage.setItem(LAST_AUTH_UID_KEY, DEFAULT_USER_UID);
-        }
+        const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY) || localStorage.getItem(CUSTOM_UID_KEY);
         const savedEmail = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
         const savedName = localStorage.getItem(LOCAL_USER_NAME_KEY);
-        if (savedCustomUid) {
+        if (savedAuthUid) {
           setCurrentUser({
-            uid: savedCustomUid,
-            displayName: savedName || (savedCustomUid === DEFAULT_USER_UID ? DEFAULT_USER_NAME : 'Trader'),
-            email: savedEmail || (savedCustomUid === DEFAULT_USER_UID ? DEFAULT_USER_EMAIL : 'trader@journal.local'),
-            photoURL: null,
-          } as unknown as User);
-        } else if (localStorage.getItem(GUEST_KEY) === 'true') {
-          setCurrentUser({
-            uid: DEFAULT_USER_UID,
-            displayName: DEFAULT_USER_NAME,
-            email: DEFAULT_USER_EMAIL,
+            uid: savedAuthUid,
+            displayName: savedName || 'Trader',
+            email: savedEmail || 'trader@journal.local',
             photoURL: null,
           } as unknown as User);
         } else {
@@ -142,13 +113,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const signInWithUid = (uid: string, name?: string, email?: string) => {
-    const targetUid = uid.trim() || DEFAULT_USER_UID;
-    const targetEmail = email || (targetUid === DEFAULT_USER_UID ? DEFAULT_USER_EMAIL : `${targetUid.slice(0, 8)}@trader.io`);
-    const targetName = name || (targetUid === DEFAULT_USER_UID ? DEFAULT_USER_NAME : 'Trader');
+    const targetUid = uid.trim() || `usr_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const targetEmail = email || `${targetUid.slice(0, 8)}@trader.local`;
+    const targetName = name || 'Trader';
     localStorage.setItem(CUSTOM_UID_KEY, targetUid);
+    localStorage.setItem(LAST_AUTH_UID_KEY, targetUid);
     localStorage.setItem(LOCAL_USER_EMAIL_KEY, targetEmail);
     localStorage.setItem(LOCAL_USER_NAME_KEY, targetName);
-    localStorage.setItem(GUEST_KEY, 'true');
     setCurrentUser({
       uid: targetUid,
       displayName: targetName,
@@ -158,7 +129,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInAsGuest = () => {
-    signInWithUid(DEFAULT_USER_UID, DEFAULT_USER_NAME, DEFAULT_USER_EMAIL);
+    const guestUid = `guest_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    signInWithUid(guestUid, 'Guest Trader', 'guest@trader.local');
   };
 
   const signInWithEmail = async (email: string, password: string): Promise<boolean> => {

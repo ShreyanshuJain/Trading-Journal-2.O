@@ -94,6 +94,7 @@ export interface Trade {
 
 export interface Account {
   id: string;
+  userId?: string;
   name: string;
   broker: string;
   startingBalance: number;
@@ -101,6 +102,7 @@ export interface Account {
   currency: string;
   type: 'Personal' | 'Demo' | 'Funded' | 'Live' | 'Prop Firm' | 'Paper' | string;
   accountType?: string;
+  description?: string;
 }
 
 export interface Strategy {
