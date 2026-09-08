@@ -267,7 +267,13 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     // Trades
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'trades'), (snap) => {
-        setTrades(snap.docs.map((d) => d.data() as unknown as Trade));
+        const incomingTrades = snap.docs.map((d) => d.data() as unknown as Trade);
+        if (incomingTrades.length > 0) {
+          setTrades(incomingTrades);
+        } else {
+          // If Firestore returns 0, do NOT overwrite if local state already has trades
+          setTrades((prev) => (prev.length > 0 ? prev : []));
+        }
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
       }, () => {
         if (!loaded.trades) { loaded.trades = true; checkDone(); }
@@ -313,7 +319,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     };
   }, [userId]);
 
-  // ── Seed default data for new users (after first load) ────────────────────
+  // ── Seed default data & check backups for user ─────────────────────────────
   useEffect(() => {
     if (dataLoading || !userId) return;
 
@@ -350,8 +356,70 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
       if (settSnap.empty) {
         await setDoc(doc(db, 'users', userId, 'settings', 'preferences'), initialSettings);
       }
+
+      // ── Trade Resilience & Migration:
+      // If the current user has 0 trades, check if trades exist in:
+      // 1) Guest/default localStorage cache
+      // 2) Server /api/data persistence file
+      const tradeSnap = await getDocs(collection(db, 'users', userId, 'trades'));
+      if (tradeSnap.empty && trades.length === 0) {
+        // Check default guest store
+        try {
+          const guestRaw = localStorage.getItem('tj_store_users/e0xW3T8S83Y8ATyma1keIe0fNX03/trades');
+          if (guestRaw) {
+            const guestTradesMap = JSON.parse(guestRaw);
+            const guestTradesList = (Object.values(guestTradesMap) as Trade[]).filter((t) => t && t.id);
+            if (guestTradesList.length > 0) {
+              for (const tr of guestTradesList) {
+                const migrated = { ...tr, userId };
+                await setDoc(doc(db, 'users', userId, 'trades', tr.id), migrated);
+              }
+              setTrades(guestTradesList.map((t) => ({ ...t, userId })));
+              return;
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // Check server backup /api/data
+        try {
+          const res = await fetch('/api/data');
+          if (res.ok) {
+            const serverData = await res.json();
+            if (Array.isArray(serverData.trades) && serverData.trades.length > 0) {
+              for (const tr of serverData.trades) {
+                const imported = { ...tr, userId };
+                await setDoc(doc(db, 'users', userId, 'trades', tr.id), imported);
+              }
+              setTrades(serverData.trades.map((t: any) => ({ ...t, userId })));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
     })();
   }, [dataLoading, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-backup to server file store whenever data updates ───────────────────
+  useEffect(() => {
+    if (trades.length === 0 && rawAccounts.length === 0) return;
+    const timer = setTimeout(() => {
+      fetch('/api/data/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trades,
+          accounts: rawAccounts,
+          strategies,
+          tags,
+          settings,
+        }),
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [trades, rawAccounts, strategies, tags, settings]);
 
   // ── Computed accounts (with currentBalance derived from trades) ─────────────
   const accounts: Account[] = useMemo(() => {

@@ -53,6 +53,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const GUEST_KEY = 'trading_journal_guest_active';
 const CUSTOM_UID_KEY = 'trading_journal_custom_uid';
+const LAST_AUTH_UID_KEY = 'trading_journal_auth_uid';
 const LOCAL_USER_EMAIL_KEY = 'trading_journal_user_email';
 const LOCAL_USER_NAME_KEY = 'trading_journal_user_name';
 const DEFAULT_USER_UID = 'e0xW3T8S83Y8ATyma1keIe0fNX03';
@@ -62,7 +63,8 @@ const DEFAULT_USER_NAME = 'Shreyanshu Jain';
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
-      const savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY);
+      const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY);
+      const savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
       const savedEmail = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
       const savedName = localStorage.getItem(LOCAL_USER_NAME_KEY);
       if (savedCustomUid) {
@@ -97,12 +99,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         localStorage.removeItem(GUEST_KEY);
-        localStorage.removeItem(CUSTOM_UID_KEY);
+        localStorage.setItem(LAST_AUTH_UID_KEY, user.uid);
         if (user.email) localStorage.setItem(LOCAL_USER_EMAIL_KEY, user.email);
         if (user.displayName) localStorage.setItem(LOCAL_USER_NAME_KEY, user.displayName);
         setCurrentUser(user);
       } else {
-        const savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY);
+        const savedAuthUid = localStorage.getItem(LAST_AUTH_UID_KEY);
+        const savedCustomUid = localStorage.getItem(CUSTOM_UID_KEY) || savedAuthUid;
         const savedEmail = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
         const savedName = localStorage.getItem(LOCAL_USER_NAME_KEY);
         if (savedCustomUid) {
@@ -369,6 +372,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = async () => {
     localStorage.removeItem(GUEST_KEY);
     localStorage.removeItem(CUSTOM_UID_KEY);
+    localStorage.removeItem(LAST_AUTH_UID_KEY);
     localStorage.removeItem(LOCAL_USER_EMAIL_KEY);
     localStorage.removeItem(LOCAL_USER_NAME_KEY);
     setCurrentUser(null);

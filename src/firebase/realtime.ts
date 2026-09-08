@@ -167,10 +167,21 @@ export function onSnapshot(
               data: () => val as Record<string, unknown>,
             });
           } else {
-            callback({
-              exists: () => false,
-              data: () => (getLocalValue(target.path) || {}) as Record<string, unknown>,
-            });
+            // If server doesn't have it yet, check if local storage has a value
+            const localVal = getLocalValue(target.path);
+            if (localVal && typeof localVal === 'object' && Object.keys(localVal).length > 0) {
+              // Preserve local value and upload to Firestore in the background
+              fsSetDoc(target.fsRef as DocumentReference<DocumentData>, localVal as Record<string, unknown>, { merge: true }).catch(() => {});
+              callback({
+                exists: () => true,
+                data: () => localVal as Record<string, unknown>,
+              });
+            } else {
+              callback({
+                exists: () => false,
+                data: () => (localVal || {}) as Record<string, unknown>,
+              });
+            }
           }
         },
         (error) => {
@@ -192,20 +203,49 @@ export function onSnapshot(
         (snapshot) => {
           if (isUnsubscribed) return;
           const colData: Record<string, Record<string, unknown>> = {};
-          const docs: DocumentSnapshot[] = snapshot.docs.map((docSnap) => {
+
+          snapshot.docs.forEach((docSnap) => {
             const d = docSnap.data();
             colData[docSnap.id] = d;
             setLocalValue(`${target.path}/${docSnap.id}`, d);
-            return {
-              id: docSnap.id,
-              ref: { path: `${target.path}/${docSnap.id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${target.path}/${docSnap.id}`) },
-              data: () => d,
-            };
           });
-          if (snapshot.docs.length > 0) {
+
+          // Check if local cache has items that aren't on the server yet
+          const cachedCol = getLocalValue(target.path) || {};
+          const cachedEntries = Object.entries(cachedCol) as [string, Record<string, unknown>][];
+
+          if (snapshot.docs.length === 0) {
+            // Server returned empty collection!
+            if (cachedEntries.length > 0) {
+              // CRITICAL: PRESERVE local items! Do NOT wipe out user data with empty snapshot!
+              // Automatically push local items to Firestore server so they are safely backed up in the cloud
+              cachedEntries.forEach(([id, item]) => {
+                if (item && typeof item === 'object') {
+                  fsSetDoc(fsDoc(db, `${target.path}/${id}`), item, { merge: true }).catch(() => {});
+                }
+              });
+              // Return the cached items so UI never resets to empty
+              callback(toCollectionSnapshot(cachedCol, target.path));
+              return;
+            }
+          } else {
+            // Server returned items: merge any local items that haven't synced yet
+            cachedEntries.forEach(([id, localItem]) => {
+              if (!colData[id] && localItem && typeof localItem === 'object') {
+                colData[id] = localItem;
+                fsSetDoc(fsDoc(db, `${target.path}/${id}`), localItem, { merge: true }).catch(() => {});
+              }
+            });
             setLocalValue(target.path, colData);
           }
-          callback({ docs, empty: snapshot.empty });
+
+          const docs: DocumentSnapshot[] = Object.entries(colData).map(([id, d]) => ({
+            id,
+            ref: { path: `${target.path}/${id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${target.path}/${id}`) },
+            data: () => d,
+          }));
+
+          callback({ docs, empty: docs.length === 0 });
         },
         (error) => {
           if (isUnsubscribed) return;

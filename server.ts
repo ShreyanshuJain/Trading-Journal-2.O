@@ -287,6 +287,9 @@ app.post('/api/data/sync', async (req, res) => {
   try {
     const { trades, accounts, strategies, tags, settings } = req.body;
 
+    // Always persist to local file store as indestructible baseline backup
+    saveLocalData({ trades, accounts, strategies, tags, settings, updatedAt: new Date().toISOString() });
+
     if (db) {
       if (Array.isArray(trades)) {
         await db.collection('trades').deleteMany({});
@@ -317,10 +320,9 @@ app.post('/api/data/sync', async (req, res) => {
           .collection('settings')
           .updateOne({ _id: 'user_settings' as any }, { $set: settings }, { upsert: true });
       }
-      return res.json({ success: true, storage: 'MongoDB' });
+      return res.json({ success: true, storage: 'MongoDB + Local File Backup' });
     }
 
-    saveLocalData({ trades, accounts, strategies, tags, settings, updatedAt: new Date().toISOString() });
     res.json({ success: true, storage: 'Local File Persistence' });
   } catch (err) {
     console.error('API /api/data/sync error:', err);
@@ -335,9 +337,39 @@ app.post('/api/trades', async (req, res) => {
     if (db) {
       await db.collection('trades').updateOne({ _id: trade.id as any }, { $set: trade }, { upsert: true });
     }
+
+    // Always update in data_store.json
+    const local = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null };
+    const currentTrades: any[] = Array.isArray(local.trades) ? local.trades : [];
+    const filtered = currentTrades.filter((t: any) => t.id !== trade.id);
+    local.trades = [trade, ...filtered];
+    local.updatedAt = new Date().toISOString();
+    saveLocalData(local);
+
     res.json({ success: true, trade });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save trade' });
+  }
+});
+
+app.put('/api/trades/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const trade = { ...req.body, id };
+    if (db) {
+      await db.collection('trades').updateOne({ _id: id as any }, { $set: trade }, { upsert: true });
+    }
+
+    const local = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null };
+    const currentTrades: any[] = Array.isArray(local.trades) ? local.trades : [];
+    const filtered = currentTrades.filter((t: any) => t.id !== id);
+    local.trades = [trade, ...filtered];
+    local.updatedAt = new Date().toISOString();
+    saveLocalData(local);
+
+    res.json({ success: true, trade });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update trade' });
   }
 });
 
@@ -347,6 +379,15 @@ app.delete('/api/trades/:id', async (req, res) => {
     if (db) {
       await db.collection('trades').deleteOne({ _id: id as any });
     }
+
+    // Always delete in data_store.json
+    const local = readLocalData();
+    if (local && Array.isArray(local.trades)) {
+      local.trades = local.trades.filter((t: any) => t.id !== id);
+      local.updatedAt = new Date().toISOString();
+      saveLocalData(local);
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete trade' });
