@@ -48,65 +48,22 @@ Designed for active forex, crypto, futures, indices, and equities traders to log
 
 ---
 
-## 🚀 Quick Start & Installation
+## 🔐 Environment Variables & Security
 
-### Prerequisites
+Pip Track is designed so that sensitive credentials are **never stored in the source code**.
 
-- **Node.js**: v18.0.0 or higher (v20+ recommended)
-- **npm**: v9.0.0 or higher
+To run your own instance, create a `.env.local` file from `.env.example` and provide **your own service credentials**.
 
-### 1. Clone the Repository & Install Dependencies
+> **Important:** The public repository does not include the author's production credentials. Do not use or commit credentials belonging to another deployment.
 
-```bash
-git clone https://github.com/your-username/trading-journal.git
-cd trading-journal
-npm install
-```
+### Services
 
-### 2. Configure Environment Variables
+* **MongoDB** — Optional. Provide your own MongoDB connection string. If omitted, Pip Track uses local persistence.
+* **Cloudinary** — Optional. Configure your own Cloudinary account for image hosting.
+* **Gemini AI** — Optional. Provide your own Gemini API key for AI-powered features.
+* **Firebase** — Optional. Configure your own Firebase project for authentication and cloud synchronization.
 
-Create your local environment configuration by copying `.env.example`:
-
-```bash
-cp .env.example .env.local
-```
-
-Open `.env.local` in your editor and configure any services you wish to connect:
-- **MongoDB**: For centralized database storage. If omitted, Pip Track persists seamlessly to local disk (`data_store.json`).
-- **Cloudinary**: For external image CDN hosting. If omitted, screenshots save directly to `./uploads/`.
-- **Gemini AI**: For AI setup reviews and trade feedback.
-- **Firebase**: For multi-device authentication and cloud Firestore sync.
-
-> ⚠️ **SECURITY NOTE**: Never commit `.env.local` or any file containing real API keys or credentials to version control. Keep all secret keys strictly in your server environment variables.
-
-### 3. Run Locally in Development Mode
-
-```bash
-npm run dev
-```
-
-The application will start at `http://localhost:3000`.
-
----
-
-## ⚙️ Environment Variables Reference
-
-| Variable | Scope | Required | Description |
-| :--- | :---: | :---: | :--- |
-| `PORT` | Server | No | Server port (default: `3000`) |
-| `MONGODB_URI` | Server | No | MongoDB connection string. Falls back to local file storage if not provided. |
-| `GEMINI_API_KEY` | Server | No | Google Gemini API key for server-side AI trade insights. |
-| `CLOUDINARY_CLOUD_NAME` | Server | No | Cloudinary cloud name for screenshot uploads. |
-| `CLOUDINARY_API_KEY` | Server | No | Cloudinary API Key. |
-| `CLOUDINARY_API_SECRET` | Server | No | Cloudinary API Secret (kept strictly server-side). |
-| `VITE_CLOUDINARY_CLOUD_NAME` | Client | No | Public Cloudinary cloud name for client uploads. |
-| `VITE_CLOUDINARY_UPLOAD_PRESET`| Client | No | Unsigned Cloudinary upload preset. |
-| `VITE_FIREBASE_API_KEY` | Client | No | Firebase client API key. |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Client | No | Firebase authentication domain. |
-| `VITE_FIREBASE_PROJECT_ID` | Client | No | Firebase Project ID. |
-| `VITE_FIREBASE_STORAGE_BUCKET`| Client | No | Firebase storage bucket. |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID`| Client | No | Firebase messaging sender ID. |
-| `VITE_FIREBASE_APP_ID` | Client | No | Firebase client App ID. |
+Never commit `.env.local`, API keys, passwords, database connection strings, or other private credentials to Git.
 
 ---
 
