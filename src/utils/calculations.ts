@@ -36,6 +36,9 @@ export function calculateRealizedRR(
   const risk = Math.abs(entry - stopLoss);
   if (!risk || risk === 0) return 0;
   
+  // Guard against microscopic fractional risk (e.g. entry=2500, stopLoss=2500.01) causing explosive R numbers
+  if (entry > 0 && risk < entry * 0.0001) return 0;
+
   const move = direction === 'BUY' ? exitPrice - entry : entry - exitPrice;
   return Number((move / risk).toFixed(2));
 }
@@ -201,7 +204,31 @@ export function calculateDashboardStats(trades: Trade[], account?: Account | nul
   const profitFactor = grossLoss > 0 ? Number((grossProfit / grossLoss).toFixed(2)) : grossProfit > 0 ? 99.9 : 0;
   const avgWin = winningTrades > 0 ? Number((grossProfit / winningTrades).toFixed(2)) : 0;
   const avgLoss = losingTrades > 0 ? Number((grossLoss / losingTrades).toFixed(2)) : 0;
-  const avgRiskReward = closedTrades > 0 ? Number((totalRR / closedTrades).toFixed(2)) : 0;
+
+  // Avg Risk : Reward (Payoff Ratio)
+  // In trading metrics, Risk:Reward represents the ratio of reward (average win) to risk (average loss).
+  // Formula: Avg Win / Avg Loss. When displayed as "1 : XR", X is always positive.
+  let avgRiskReward = 0;
+  if (avgLoss > 0 && avgWin > 0) {
+    avgRiskReward = Number((avgWin / avgLoss).toFixed(2));
+  } else if (winningTrades > 0) {
+    const positiveRRs = trades
+      .map((t) => (typeof t.realizedRR === 'number' ? t.realizedRR : parseFloat(t.realizedRR as any) || 0))
+      .filter((r) => r > 0);
+    if (positiveRRs.length > 0) {
+      avgRiskReward = Number((positiveRRs.reduce((a, b) => a + b, 0) / positiveRRs.length).toFixed(2));
+    } else {
+      const plannedRRs = trades
+        .map((t) => (typeof t.plannedRR === 'number' ? t.plannedRR : parseFloat(t.plannedRR as any) || 0))
+        .filter((r) => r > 0);
+      if (plannedRRs.length > 0) {
+        avgRiskReward = Number((plannedRRs.reduce((a, b) => a + b, 0) / plannedRRs.length).toFixed(2));
+      } else {
+        avgRiskReward = 0;
+      }
+    }
+  }
+  avgRiskReward = Math.max(0, avgRiskReward);
 
   // Expectancy = (Win Rate * Avg Win) - (Loss Rate * Avg Loss)
   const winProb = winRate / 100;
@@ -422,7 +449,13 @@ export function calculateStrategyStats(trades: Trade[], strategies: Strategy[]):
     const closed = st.wins + st.losses;
     st.winRate = closed > 0 ? Number(((st.wins / closed) * 100).toFixed(1)) : 0;
     st.netPL = Number(st.netPL.toFixed(2));
-    st.avgRR = st.totalTrades > 0 ? Number((sg.totalRR / st.totalTrades).toFixed(2)) : 0;
+    const avgWin = st.wins > 0 ? sg.profit / st.wins : 0;
+    const avgLoss = st.losses > 0 ? sg.loss / st.losses : 0;
+    st.avgRR = avgLoss > 0 && avgWin > 0
+      ? Number((avgWin / avgLoss).toFixed(2))
+      : st.totalTrades > 0
+        ? Math.max(0, Number((sg.totalRR / st.totalTrades).toFixed(2)))
+        : 0;
     st.profitFactor = sg.loss > 0 ? Number((sg.profit / sg.loss).toFixed(2)) : sg.profit > 0 ? 99.9 : 0;
     return st;
   });
@@ -455,7 +488,13 @@ export function calculatePairStats(trades: Trade[]): PairPerformance[] {
     const closed = wins + losses;
     const winRate = closed > 0 ? Number(((wins / closed) * 100).toFixed(1)) : 0;
     const netPL = Number(data.trades.reduce((acc, t) => acc + (Number(t.netPL) || 0), 0).toFixed(2));
-    const avgRR = totalTrades > 0 ? Number((data.totalRR / totalTrades).toFixed(2)) : 0;
+    const avgWin = wins > 0 ? data.profit / wins : 0;
+    const avgLoss = losses > 0 ? data.loss / losses : 0;
+    const avgRR = avgLoss > 0 && avgWin > 0
+      ? Number((avgWin / avgLoss).toFixed(2))
+      : totalTrades > 0
+        ? Math.max(0, Number((data.totalRR / totalTrades).toFixed(2)))
+        : 0;
     const profitFactor = data.loss > 0 ? Number((data.profit / data.loss).toFixed(2)) : data.profit > 0 ? 99.9 : 0;
 
     return {
@@ -485,8 +524,16 @@ export function calculateSessionStats(trades: Trade[]): SessionPerformance[] {
     const closed = wins + losses;
     const winRate = closed > 0 ? Number(((wins / closed) * 100).toFixed(1)) : 0;
     const netPL = Number(sessionTrades.reduce((acc, t) => acc + (Number(t.netPL) || 0), 0).toFixed(2));
+    const grossProfit = sessionTrades.filter((t) => (Number(t.netPL) || 0) > 0).reduce((acc, t) => acc + Number(t.netPL), 0);
+    const grossLoss = sessionTrades.filter((t) => (Number(t.netPL) || 0) < 0).reduce((acc, t) => acc + Math.abs(Number(t.netPL)), 0);
+    const avgWin = wins > 0 ? grossProfit / wins : 0;
+    const avgLoss = losses > 0 ? grossLoss / losses : 0;
     const totalRR = sessionTrades.reduce((acc, t) => acc + (Number(t.realizedRR) || 0), 0);
-    const avgRR = totalTrades > 0 ? Number((totalRR / totalTrades).toFixed(2)) : 0;
+    const avgRR = avgLoss > 0 && avgWin > 0
+      ? Number((avgWin / avgLoss).toFixed(2))
+      : totalTrades > 0
+        ? Math.max(0, Number((totalRR / totalTrades).toFixed(2)))
+        : 0;
 
     return {
       session: s,
