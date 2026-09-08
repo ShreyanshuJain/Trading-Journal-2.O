@@ -257,7 +257,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     // Accounts
     unsubscribers.push(
       onSnapshot(collection(db, 'users', userId, 'accounts'), (snap) => {
-        setRawAccounts(snap.docs.map((d) => d.data() as Omit<Account, 'currentBalance'>));
+        setRawAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Omit<Account, 'currentBalance'>));
         if (!loaded.accounts) { loaded.accounts = true; checkDone(); }
       }, () => {
         if (!loaded.accounts) { loaded.accounts = true; checkDone(); }
@@ -324,16 +324,7 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
     if (dataLoading || !userId) return;
 
     (async () => {
-      // Accounts: seed if empty
-      const accSnap = await getDocs(collection(db, 'users', userId, 'accounts'));
-      if (accSnap.empty) {
-        await Promise.all(
-          initialAccounts.map((acc) => {
-            const { currentBalance: _cb, ...rest } = acc as Account;
-            return setDoc(doc(db, 'users', userId, 'accounts', acc.id), rest);
-          })
-        );
-      }
+      // Accounts: do NOT auto-seed default account; accounts are created only when added by user
 
       // Strategies: seed if empty
       const stratSnap = await getDocs(collection(db, 'users', userId, 'strategies'));
@@ -423,17 +414,19 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
 
   // ── Computed accounts (with currentBalance derived from trades) ─────────────
   const accounts: Account[] = useMemo(() => {
-    return rawAccounts.map((acc) => {
-      const accTrades = trades.filter((t) => t.accountId === acc.id);
-      const totalNetPL = accTrades.reduce((sum, t) => {
-        const pl = typeof t.netPL === 'number' ? t.netPL : parseFloat(t.netPL as any) || 0;
-        return sum + pl;
-      }, 0);
-      return {
-        ...acc,
-        currentBalance: Number(((acc.startingBalance || 0) + totalNetPL).toFixed(2)),
-      };
-    });
+    return rawAccounts
+      .filter((acc) => acc && acc.id && acc.id.trim() !== '')
+      .map((acc) => {
+        const accTrades = trades.filter((t) => t.accountId === acc.id);
+        const totalNetPL = accTrades.reduce((sum, t) => {
+          const pl = typeof t.netPL === 'number' ? t.netPL : parseFloat(t.netPL as any) || 0;
+          return sum + pl;
+        }, 0);
+        return {
+          ...acc,
+          currentBalance: Number(((acc.startingBalance || 0) + totalNetPL).toFixed(2)),
+        };
+      });
   }, [rawAccounts, trades]);
 
   const activeAccount = useMemo(() => {
@@ -679,12 +672,8 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
         })
       );
 
-      // Re-seed accounts, strategies, tags
+      // Re-seed strategies and tags (do NOT re-seed accounts; user accounts are managed by user)
       await Promise.all([
-        ...initialAccounts.map((acc) => {
-          const { currentBalance: _cb, ...rest } = acc as Account;
-          return setDoc(doc(db, 'users', userId, 'accounts', acc.id), rest);
-        }),
         ...initialStrategies.map((s) => setDoc(doc(db, 'users', userId, 'strategies', s.id), s)),
         ...initialTags.map((t) => setDoc(doc(db, 'users', userId, 'tags', t.id), t)),
         setDoc(doc(db, 'users', userId, 'settings', 'preferences'), initialSettings),
@@ -703,28 +692,113 @@ export const JournalProvider: React.FC<{ userId: string; children: ReactNode }> 
   // ── CRUD: Accounts ─────────────────────────────────────────────────────────
 
   const addAccount = (acc: Omit<Account, 'id' | 'currentBalance'>) => {
-    const newAcc = { ...acc, id: `acc_${Date.now()}` };
-    setDoc(doc(db, 'users', userId, 'accounts', newAcc.id), newAcc)
-      .then(() => showToast('Trading account added'))
-      .catch(() => showToast('Failed to add account.'));
+    const newId = `acc_${Date.now()}`;
+    const newAcc: Omit<Account, 'currentBalance'> = {
+      ...acc,
+      id: newId,
+      type: (acc as any).type || (acc as any).accountType || 'Live',
+      accountType: (acc as any).accountType || (acc as any).type || 'Live',
+    };
+
+    // 1. Immediate optimistic UI update
+    setRawAccounts((prev) => [...prev.filter((a) => a.id !== newId), newAcc]);
+    showToast('Trading account added');
+
+    // 2. Direct sync to server data store
+    const updatedAccounts = [...rawAccounts.filter((a) => a.id !== newId), newAcc];
+    fetch('/api/data/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trades,
+        accounts: updatedAccounts,
+        strategies,
+        tags,
+        settings,
+      }),
+    }).catch(() => {});
+
+    // 3. Persist to Firestore
+    setDoc(doc(db, 'users', userId, 'accounts', newId), newAcc).catch((err) => {
+      console.warn('Firestore add account error:', err);
+    });
   };
 
   const updateAccount = (id: string, fields: Partial<Omit<Account, 'currentBalance'>>) => {
     const existing = rawAccounts.find((a) => a.id === id);
     if (!existing) return;
     const updated = { ...existing, ...fields };
-    setDoc(doc(db, 'users', userId, 'accounts', id), updated, { merge: true })
-      .then(() => showToast('Account updated'))
-      .catch(() => showToast('Failed to update account.'));
+
+    // 1. Immediate optimistic UI update
+    setRawAccounts((prev) => prev.map((a) => (a.id === id ? updated : a)));
+    showToast('Account updated');
+
+    // 2. Direct sync to server data store
+    const updatedAccounts = rawAccounts.map((a) => (a.id === id ? updated : a));
+    fetch('/api/data/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trades,
+        accounts: updatedAccounts,
+        strategies,
+        tags,
+        settings,
+      }),
+    }).catch(() => {});
+
+    // 3. Persist to Firestore
+    setDoc(doc(db, 'users', userId, 'accounts', id), updated, { merge: true }).catch((err) => {
+      console.warn('Firestore update account error:', err);
+    });
   };
 
   const deleteAccount = (id: string) => {
-    deleteDoc(doc(db, 'users', userId, 'accounts', id))
-      .then(() => {
-        if (activeAccountId === id) setActiveAccountId('all');
-        showToast('Account deleted');
-      })
-      .catch(() => showToast('Failed to delete account.'));
+    if (!id) return;
+
+    // 1. Immediate optimistic UI update
+    setRawAccounts((prev) => prev.filter((a) => a.id !== id && a.id !== undefined));
+    if (activeAccountId === id) {
+      setActiveAccountId('all');
+    }
+    showToast('Account deleted');
+
+    // 2. Clear from local storage cache directly
+    try {
+      const colPath = `users/${userId}/accounts`;
+      const docPath = `${colPath}/${id}`;
+      localStorage.removeItem(`tj_store_${docPath}`);
+      const rawCol = localStorage.getItem(`tj_store_${colPath}`);
+      if (rawCol) {
+        const parsed = JSON.parse(rawCol);
+        delete parsed[id];
+        delete parsed['undefined'];
+        localStorage.setItem(`tj_store_${colPath}`, JSON.stringify(parsed));
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Direct sync to server
+    const remainingAccounts = rawAccounts.filter((a) => a.id !== id && a.id !== undefined);
+    fetch('/api/data/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trades,
+        accounts: remainingAccounts,
+        strategies,
+        tags,
+        settings,
+      }),
+    }).catch(() => {});
+
+    fetch(`/api/accounts/${id}`, { method: 'DELETE' }).catch(() => {});
+
+    // 4. Delete from Firestore
+    deleteDoc(doc(db, 'users', userId, 'accounts', id)).catch((err) => {
+      console.warn('Firestore delete account error:', err);
+    });
   };
 
   // ── CRUD: Strategies ───────────────────────────────────────────────────────

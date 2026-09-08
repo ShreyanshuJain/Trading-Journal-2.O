@@ -19,10 +19,11 @@ export const AccountsView: React.FC = () => {
       name: name.trim(),
       broker: broker.trim() || 'Generic Broker',
       accountType: type,
-      startingBalance: Number(startingBalance),
-      currentBalance: Number(startingBalance),
+      type,
+      startingBalance: Number(startingBalance) || 0,
+      currentBalance: Number(startingBalance) || 0,
       currency,
-    });
+    } as any);
     setName('');
     setBroker('');
     setStartingBalance(10000);
@@ -38,64 +39,81 @@ export const AccountsView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Accounts Cards List */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {accounts.map((acc) => {
-              const accTrades = trades.filter((t) => t.accountId === acc.id);
-              const netPL = accTrades.reduce((sum, t) => sum + t.netPL, 0);
-              const plPercent = acc.startingBalance > 0 ? (netPL / acc.startingBalance) * 100 : 0;
-              const isProfit = netPL >= 0;
+          {accounts.length === 0 ? (
+            <div className="bg-[#15181D] border border-[#292D33] border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#1B1F24] border border-[#292D33] flex items-center justify-center text-[#6F7680]">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-semibold text-[#F5F5F5]">No Trading Accounts</h3>
+              <p className="text-xs text-[#A0A6AE] max-w-sm">
+                No accounts have been created yet. Use the &quot;Add Trading Account&quot; form on the right to add an account whenever you want.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {accounts.map((acc) => {
+                const accTrades = trades.filter((t) => t.accountId === acc.id);
+                const netPL = accTrades.reduce((sum, t) => sum + (typeof t.netPL === 'number' ? t.netPL : parseFloat(t.netPL as any) || 0), 0);
+                const plPercent = acc.startingBalance > 0 ? (netPL / acc.startingBalance) * 100 : 0;
+                const isProfit = netPL >= 0;
 
-              return (
-                <div
-                  key={acc.id}
-                  className="bg-[#15181D] border border-[#292D33] rounded-xl p-5 flex flex-col justify-between space-y-4 hover:border-[#3A3F47] transition-all"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-base text-[#F5F5F5]">{acc.name}</span>
-                        <span className="px-2 py-0.5 text-[10px] uppercase font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {acc.accountType}
+                return (
+                  <div
+                    key={acc.id}
+                    className="bg-[#15181D] border border-[#292D33] rounded-xl p-5 flex flex-col justify-between space-y-4 hover:border-[#3A3F47] transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-base text-[#F5F5F5]">{acc.name}</span>
+                          <span className="px-2 py-0.5 text-[10px] uppercase font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {acc.accountType || acc.type || 'Account'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#A0A6AE] mt-0.5">{acc.broker}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          deleteAccount(acc.id);
+                        }}
+                        className="text-[#6F7680] hover:text-red-400 hover:bg-red-500/10 rounded p-1.5 cursor-pointer transition-colors"
+                        title="Delete Account"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Balances */}
+                    <div className="bg-[#1B1F24] border border-[#292D33] rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-[#6F7680]">Current Balance</span>
+                        <span className="text-lg font-bold text-[#F5F5F5]">
+                          ${acc.currentBalance.toLocaleString()} {acc.currency}
                         </span>
                       </div>
-                      <p className="text-xs text-[#A0A6AE] mt-0.5">{acc.broker}</p>
+
+                      <div className="flex justify-between items-center text-xs pt-2 border-t border-[#292D33]/60">
+                        <span className="text-[#6F7680]">Total Net P/L</span>
+                        <span className={`font-semibold flex items-center gap-1 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isProfit ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                          {isProfit ? '+' : ''}${netPL.toLocaleString()} ({plPercent.toFixed(2)}%)
+                        </span>
+                      </div>
                     </div>
 
-                    <button
-                      onClick={() => deleteAccount(acc.id)}
-                      className="text-[#6F7680] hover:text-red-400 cursor-pointer transition-colors p-1"
-                      title="Delete Account"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Balances */}
-                  <div className="bg-[#1B1F24] border border-[#292D33] rounded-lg p-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-[#6F7680]">Current Balance</span>
-                      <span className="text-lg font-bold text-[#F5F5F5]">
-                        ${acc.currentBalance.toLocaleString()} {acc.currency}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs pt-2 border-t border-[#292D33]/60">
-                      <span className="text-[#6F7680]">Total Net P/L</span>
-                      <span className={`font-semibold flex items-center gap-1 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {isProfit ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                        {isProfit ? '+' : ''}${netPL.toLocaleString()} ({plPercent.toFixed(2)}%)
-                      </span>
+                    <div className="flex items-center justify-between text-xs text-[#A0A6AE]">
+                      <span>Trades Logged: {accTrades.length}</span>
+                      <span>Start: ${acc.startingBalance.toLocaleString()}</span>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs text-[#A0A6AE]">
-                    <span>Trades Logged: {accTrades.length}</span>
-                    <span>Start: ${acc.startingBalance.toLocaleString()}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="p-4 bg-[#15181D] border border-[#292D33] rounded-xl flex items-center justify-between">
             <div className="flex items-center gap-3">

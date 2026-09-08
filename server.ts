@@ -441,6 +441,47 @@ app.delete('/api/trades/:id', async (req, res) => {
   }
 });
 
+// Single Account Operations
+app.post('/api/accounts', async (req, res) => {
+  try {
+    const account = req.body;
+    if (db) {
+      await db.collection('accounts').updateOne({ _id: account.id as any }, { $set: account }, { upsert: true });
+    }
+
+    const local = readLocalData() || { trades: [], accounts: [], strategies: [], tags: [], settings: null };
+    const currentAccounts: any[] = Array.isArray(local.accounts) ? local.accounts : [];
+    const filtered = currentAccounts.filter((a: any) => a.id !== account.id);
+    local.accounts = [...filtered, account];
+    local.updatedAt = new Date().toISOString();
+    saveLocalData(local);
+
+    res.json({ success: true, account });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save account' });
+  }
+});
+
+app.delete('/api/accounts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (db) {
+      await db.collection('accounts').deleteOne({ _id: id as any });
+    }
+
+    const local = readLocalData();
+    if (local && Array.isArray(local.accounts)) {
+      local.accounts = local.accounts.filter((a: any) => a.id !== id);
+      local.updatedAt = new Date().toISOString();
+      saveLocalData(local);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 async function startServer() {
   await initMongoDB();
 

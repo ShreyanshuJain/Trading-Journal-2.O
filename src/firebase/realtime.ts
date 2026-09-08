@@ -89,7 +89,7 @@ function toCollectionSnapshot(value: Record<string, Record<string, unknown>> | n
     ? Object.entries(value).map(([id, data]) => ({
         id,
         ref: { path: `${path}/${id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${path}/${id}`) },
-        data: () => data || {},
+        data: () => ({ id, ...(data || {}) }),
       }))
     : [];
 
@@ -206,43 +206,24 @@ export function onSnapshot(
 
           snapshot.docs.forEach((docSnap) => {
             const d = docSnap.data();
-            colData[docSnap.id] = d;
-            setLocalValue(`${target.path}/${docSnap.id}`, d);
+            const fullDoc = { id: docSnap.id, ...d };
+            colData[docSnap.id] = fullDoc;
+            setLocalValue(`${target.path}/${docSnap.id}`, fullDoc);
           });
 
-          // Check if local cache has items that aren't on the server yet
-          const cachedCol = getLocalValue(target.path) || {};
-          const cachedEntries = Object.entries(cachedCol) as [string, Record<string, unknown>][];
-
           if (snapshot.docs.length === 0) {
-            // Server returned empty collection!
-            if (cachedEntries.length > 0) {
-              // CRITICAL: PRESERVE local items! Do NOT wipe out user data with empty snapshot!
-              // Automatically push local items to Firestore server so they are safely backed up in the cloud
-              cachedEntries.forEach(([id, item]) => {
-                if (item && typeof item === 'object') {
-                  fsSetDoc(fsDoc(db, `${target.path}/${id}`), item, { merge: true }).catch(() => {});
-                }
-              });
-              // Return the cached items so UI never resets to empty
-              callback(toCollectionSnapshot(cachedCol, target.path));
-              return;
-            }
-          } else {
-            // Server returned items: merge any local items that haven't synced yet
-            cachedEntries.forEach(([id, localItem]) => {
-              if (!colData[id] && localItem && typeof localItem === 'object') {
-                colData[id] = localItem;
-                fsSetDoc(fsDoc(db, `${target.path}/${id}`), localItem, { merge: true }).catch(() => {});
-              }
-            });
-            setLocalValue(target.path, colData);
+            // Collection is genuinely empty on the server
+            setLocalValue(target.path, {});
+            callback({ docs: [], empty: true });
+            return;
           }
+
+          setLocalValue(target.path, colData);
 
           const docs: DocumentSnapshot[] = Object.entries(colData).map(([id, d]) => ({
             id,
             ref: { path: `${target.path}/${id}`, kind: 'doc' as const, fsRef: fsDoc(db, `${target.path}/${id}`) },
-            data: () => d,
+            data: () => ({ id, ...(d || {}) }),
           }));
 
           callback({ docs, empty: docs.length === 0 });
@@ -300,19 +281,22 @@ export async function deleteDoc(target: PathRef<'doc'>) {
   const docId = pathParts[pathParts.length - 1];
   const collectionPath = pathParts.slice(0, -1).join('/');
 
-  try {
-    await fsDeleteDoc(target.fsRef as DocumentReference<DocumentData>);
-  } catch (err) {
-    console.warn('[Firestore deleteDoc fallback to cache]:', err);
-  }
-
+  // 1. Immediately remove from local cache and notify subscribers
   removeLocalValue(target.path);
   if (collectionPath) {
     const colVal = getLocalValue(collectionPath) || {};
     delete colVal[docId];
     setLocalValue(collectionPath, colVal);
+    notifyListeners(collectionPath);
   }
   notifyListeners(target.path);
+
+  // 2. Synchronize deletion with Firestore in background
+  try {
+    await fsDeleteDoc(target.fsRef as DocumentReference<DocumentData>);
+  } catch (err) {
+    console.warn('[Firestore deleteDoc fallback to cache]:', err);
+  }
 }
 
 export async function getDocs(target: PathRef<'collection'>): Promise<CollectionSnapshot> {

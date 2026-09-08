@@ -1,16 +1,6 @@
 import { Trade, Account, Strategy, Tag, UserSettings } from '../types';
 
-export const initialAccounts: Account[] = [
-  {
-    id: 'acc_main',
-    name: 'Main Trading Account',
-    broker: 'Live / Prop Firm',
-    startingBalance: 10000,
-    currentBalance: 10000,
-    currency: 'USD',
-    type: 'Live',
-  },
-];
+export const initialAccounts: Account[] = [];
 
 export const initialStrategies: Strategy[] = [
   {
@@ -41,7 +31,7 @@ export const initialTags: Tag[] = [
 ];
 
 export const initialSettings: UserSettings = {
-  defaultAccountId: 'acc_main',
+  defaultAccountId: '',
   baseCurrency: 'USD',
   timezone: 'America/New_York',
   defaultRiskPercent: 1.0,

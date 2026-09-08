@@ -99,7 +99,8 @@ export interface Account {
   startingBalance: number;
   currentBalance: number; // Computed from trades; not persisted to Realtime Database
   currency: string;
-  type: 'Personal' | 'Demo' | 'Funded' | 'Live';
+  type: 'Personal' | 'Demo' | 'Funded' | 'Live' | 'Prop Firm' | 'Paper' | string;
+  accountType?: string;
 }
 
 export interface Strategy {
