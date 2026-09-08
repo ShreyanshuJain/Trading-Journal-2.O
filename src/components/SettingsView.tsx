@@ -40,10 +40,10 @@ export const SettingsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'accounts' | 'strategies' | 'risk' | 'cloudinary' | 'data'>('accounts');
 
   // Cloudinary State
-  const [cloudName, setCloudName] = useState<string>(settings.cloudinaryCloudName || 'bgowyyl2');
-  const [apiKey, setApiKey] = useState<string>(settings.cloudinaryApiKey || '124251242856859');
+  const [cloudName, setCloudName] = useState<string>(settings.cloudinaryCloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '');
+  const [apiKey, setApiKey] = useState<string>(settings.cloudinaryApiKey || '');
   const [apiSecret, setApiSecret] = useState<string>(settings.cloudinaryApiSecret || '');
-  const [uploadPreset, setUploadPreset] = useState<string>(settings.cloudinaryUploadPreset || '');
+  const [uploadPreset, setUploadPreset] = useState<string>(settings.cloudinaryUploadPreset || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '');
   const [isTestingCloudinary, setIsTestingCloudinary] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; url?: string } | null>(null);
 
@@ -507,7 +507,7 @@ export const SettingsView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. bgowyyl2"
+                    placeholder="e.g. my-trading-cloud"
                     value={cloudName}
                     onChange={(e) => setCloudName(e.target.value)}
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] text-xs rounded-lg px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 font-mono"
@@ -520,7 +520,7 @@ export const SettingsView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 124251242856859"
+                    placeholder="e.g. 123456789012345"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     className="w-full bg-[#1B1F24] border border-[#292D33] text-[#F5F5F5] text-xs rounded-lg px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 font-mono"

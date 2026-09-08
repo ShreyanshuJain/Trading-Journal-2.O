@@ -6,20 +6,41 @@ import { createServer as createViteServer } from 'vite';
 import { MongoClient, Db } from 'mongodb';
 import dotenv from 'dotenv';
 import { v2 as cloudinary } from 'cloudinary';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
-// Configure Cloudinary
-const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || 'bgowyyl2';
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '124251242856859';
-const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || '';
+// Configure Cloudinary from environment variables
+const CLOUDINARY_CLOUD_NAME =
+  process.env.CLOUDINARY_CLOUD_NAME ||
+  process.env.VITE_CLOUDINARY_CLOUD_NAME ||
+  '';
 
-cloudinary.config({
-  cloud_name: CLOUDINARY_CLOUD_NAME,
-  api_key: CLOUDINARY_API_KEY,
-  api_secret: CLOUDINARY_API_SECRET,
-  secure: true,
-});
+const CLOUDINARY_API_KEY =
+  process.env.CLOUDINARY_API_KEY || '';
+
+const CLOUDINARY_API_SECRET =
+  process.env.CLOUDINARY_API_SECRET || '';
+
+if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
+  cloudinary.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
+    secure: true,
+  });
+}
+
+// Lazy-initialized Gemini AI Client
+let aiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({ apiKey });
+  }
+  return aiClient;
+}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -87,11 +108,37 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     database: db ? 'MongoDB' : 'Local File Persistence',
     cloudinary: {
-      cloudName: CLOUDINARY_CLOUD_NAME,
-      configured: Boolean(CLOUDINARY_API_SECRET),
+      cloudName: CLOUDINARY_CLOUD_NAME || 'Not configured',
+      configured: Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_SECRET),
+    },
+    gemini: {
+      configured: Boolean(process.env.GEMINI_API_KEY),
     },
     timestamp: new Date().toISOString(),
   });
+});
+
+// Secure Backend Gemini AI Endpoint (Server-Side Only)
+app.post('/api/ai/trade-review', async (req, res) => {
+  try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'Gemini AI is not configured. Set GEMINI_API_KEY in your environment variables.',
+      });
+    }
+
+    const { trade, prompt } = req.body;
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt || `Please review this trade setup and provide concise trading psychology and risk management insights: ${JSON.stringify(trade)}`,
+    });
+
+    return res.json({ success: true, text: response.text });
+  } catch (err: any) {
+    console.error('Gemini AI processing error:', err.message || err);
+    return res.status(500).json({ error: err.message || 'Failed to process AI review' });
+  }
 });
 
 // Helper to save base64/buffer image to local uploads folder

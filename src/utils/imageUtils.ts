@@ -163,7 +163,7 @@ export async function uploadScreenshotImage(
   }
 
   // 2. Direct Cloudinary unsigned preset if available
-  const cName = (cloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'bgowyyl2').trim();
+  const cName = (cloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '').trim();
   const preset = (uploadPreset || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '').trim();
 
   if (cName && preset) {
@@ -212,7 +212,7 @@ export function isCloudinaryConfigured(
   apiKey?: string,
   apiSecret?: string
 ): boolean {
-  const cName = (cloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'bgowyyl2').trim();
+  const cName = (cloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '').trim();
   const preset = (uploadPreset || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '').trim();
   const aSecret = (apiSecret || '').trim();
   return Boolean(cName && (preset || aSecret));

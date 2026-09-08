@@ -303,7 +303,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGoogle = async () => {
     setAuthError(null);
     setAuthErrorCode(null);
-    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+    const apiKey = (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) || (auth.app?.options?.apiKey as string | undefined) || '';
     if (!apiKey || apiKey.includes('Placeholder') || !apiKey.startsWith('AIza')) {
       setAuthErrorCode('auth/invalid-api-key');
       setAuthError(

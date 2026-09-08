@@ -53,10 +53,10 @@ export const initialSettings: UserSettings = {
   defaultCommission: 0,
   enableNotifications: true,
   theme: 'dark',
-  cloudinaryCloudName: 'bgowyyl2',
-  cloudinaryApiKey: '124251242856859',
+  cloudinaryCloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '',
+  cloudinaryApiKey: '',
   cloudinaryApiSecret: '',
-  cloudinaryUploadPreset: '',
+  cloudinaryUploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '',
 };
 
 export const initialTrades: Trade[] = [];
