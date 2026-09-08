@@ -18,7 +18,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from 'lucide-react';
-import { useAuth, isPreviewDomain } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const {
@@ -50,17 +50,11 @@ export const LoginPage: React.FC = () => {
   const [copiedHost, setCopiedHost] = useState(false);
   const [copiedWildcard, setCopiedWildcard] = useState(false);
   const [currentHostname, setCurrentHostname] = useState('');
-  const [proactiveNotice, setProactiveNotice] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const host = window.location.hostname;
-      setCurrentHostname(host);
-      // Proactively check if on an AI Studio preview domain or untrusted domain
-      if (isPreviewDomain(host)) {
-        setProactiveNotice(true);
-      }
+      setCurrentHostname(window.location.hostname);
     }
   }, []);
 
@@ -110,8 +104,7 @@ export const LoginPage: React.FC = () => {
     authError?.toLowerCase().includes('authorized domain') ||
     authError?.toLowerCase().includes('not authorized');
 
-  const isUnauthorizedDomain =
-    (!dismissedNotice && proactiveNotice) || isAuthErrorUnauthorized;
+  const isUnauthorizedDomain = !dismissedNotice && isAuthErrorUnauthorized;
 
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'trading-journal-f8d1a';
   const firebaseSettingsUrl = `https://console.firebase.google.com/project/${projectId}/authentication/settings`;
